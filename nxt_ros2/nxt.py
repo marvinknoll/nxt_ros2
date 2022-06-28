@@ -3,7 +3,8 @@ import rclpy.executors
 import rclpy.node
 
 import nxt_msgs2.msg
-from sensor_msgs.msg import Range
+import sensor_msgs.msg
+import std_msgs.msg
 
 import nxt
 import nxt.locator
@@ -30,8 +31,8 @@ class TouchSensor(rclpy.node.Node):
         msg.touch = self._sensor.get_sample()
         self._publisher.publish(msg)
 
-    def destroy_node(self):
-        super().destroy_node()
+    def destroy(self):
+        return super().destroy_node()
 
 
 class UltraSonicSensor(rclpy.node.Node):
@@ -45,7 +46,7 @@ class UltraSonicSensor(rclpy.node.Node):
         self._sensor = comm.get_sensor(port, nxt.sensor.generic.Ultrasonic)
 
         self._publisher = self.create_publisher(
-            Range, 'ultrasonic_sensor', 10)
+            sensor_msgs.msg.Range, 'ultrasonic_sensor', 10)
 
         timer_period = 0.3  # seconds
         self._timer = self.create_timer(timer_period, self.measure)
@@ -58,7 +59,7 @@ class UltraSonicSensor(rclpy.node.Node):
         max_range = self.get_parameter(
             'max_range').get_parameter_value().double_value
 
-        msg = Range()
+        msg = sensor_msgs.msg.Range()
         msg.header.stamp = self.get_clock().now().to_msg()
         msg.radiation_type = 0  # ultrasound
         msg.field_of_view = field_of_view
@@ -68,8 +69,63 @@ class UltraSonicSensor(rclpy.node.Node):
 
         self._publisher.publish(msg)
 
-    def destroy_node(self):
-        super().destroy_node()
+    def destroy(self):
+        return super().destroy_node()
+
+
+class ColorSensor(rclpy.node.Node):
+    def __init__(self, comm: nxt.brick.Brick, port: nxt.sensor.Port):
+        super().__init__('color_sensor')
+
+        self._sensor = comm.get_sensor(port, nxt.sensor.generic.Color)
+
+        self._publisher = self.create_publisher(
+            nxt_msgs2.msg.Color, 'color_sensor', 10)
+
+        timer_period = 0.3  # seconds
+        self._timer = self.create_timer(timer_period, self.measure)
+
+    def measure(self):
+        msg = nxt_msgs2.msg.Color()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        sample = self._sensor.get_color()
+        msg.color = self.color_code_to_rgba(sample)
+
+        self._publisher.publish(msg)
+
+    def destroy(self):
+        self._sensor.set_light_color(nxt.sensor.Type.COLOR_EXIT)
+        return super().destroy_node()
+
+    def color_code_to_rgba(self, color_code: int) -> std_msgs.msg.ColorRGBA:
+        """Converts nxt_python's color code to std_msgs.msg.ColorRGBA"""
+        color = std_msgs.msg.ColorRGBA()
+        if color_code == 1:  # black
+            color.r = 0.0
+            color.g = 0.0
+            color.b = 0.0
+        elif color_code == 2:  # blue
+            color.r = 0.0
+            color.g = 0.0
+            color.b = 255.0
+        elif color_code == 3:  # green
+            color.r = 0.0
+            color.g = 255.0
+            color.b = 0.0
+        elif color_code == 4:  # yellow
+            color.r = 255.0
+            color.g = 255.0
+            color.b = 0.0
+        elif color_code == 5:  # red
+            color.r = 255.0
+            color.g = 0.0
+            color.b = 0.0
+        elif color_code == 6:  # white
+            color.r = 255.0
+            color.g = 255.0
+            color.b = 255.0
+        color.a = 1.0
+        return color
 
 
 def main(args=None):
@@ -79,18 +135,21 @@ def main(args=None):
         with nxt.locator.find() as b:
             touch_sensor = TouchSensor(b, nxt.sensor.Port.S1)
             ultrasonic_sensor = UltraSonicSensor(b, nxt.sensor.Port.S4)
+            color_sensor = ColorSensor(b, nxt.sensor.Port.S3)
 
             executor = rclpy.executors.MultiThreadedExecutor()
             executor.add_node(touch_sensor)
             executor.add_node(ultrasonic_sensor)
+            executor.add_node(color_sensor)
 
             try:
                 executor.spin()
             finally:
                 executor.shutdown()
 
-                for node in executor._nodes:
-                    node.destroy_node()
+                touch_sensor.destroy()
+                ultrasonic_sensor.destroy()
+                color_sensor.destroy()
 
     finally:
         rclpy.shutdown()
