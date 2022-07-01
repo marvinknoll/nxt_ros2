@@ -14,17 +14,17 @@ import nxt.brick
 import nxt.sensor
 import nxt.sensor.generic
 
-from typing import List
+from typing import Dict, List
 
 
 class TouchSensor(rclpy.node.Node):
-    def __init__(self, comm: nxt.brick.Brick, port: nxt.sensor.Port):
-        super().__init__('touch_sensor')
+    def __init__(self, brick: nxt.brick.Brick, name: str, port: nxt.sensor.Port):
+        super().__init__(name)
 
-        self._sensor = comm.get_sensor(port, nxt.sensor.generic.Touch)
+        self._sensor = brick.get_sensor(port, nxt.sensor.generic.Touch)
 
         self._publisher = self.create_publisher(
-            nxt_msgs2.msg.Touch, 'touch_sensor', 10)
+            nxt_msgs2.msg.Touch, name, 10)
 
         timer_period = 0.3  # seconds
         self._timer = self.create_timer(timer_period, self.measure)
@@ -35,22 +35,24 @@ class TouchSensor(rclpy.node.Node):
         msg.touch = self._sensor.get_sample()
         self._publisher.publish(msg)
 
-    def destroy(self):
+    def destroy_node(self):
         return super().destroy_node()
 
 
 class UltraSonicSensor(rclpy.node.Node):
-    def __init__(self, comm: nxt.brick.Brick, port: nxt.sensor.Port):
-        super().__init__('ultrasonic_sensor')
+    def __init__(self, brick: nxt.brick.Brick, name: str, port: nxt.sensor.Port):
+        super().__init__(name)
 
-        self.declare_parameter('field_of_view', 0.5235988)  # 30 degrees
-        self.declare_parameter('min_range', 0.07)  # meters
-        self.declare_parameter('max_range', 2.54)  # meters
+        # Default values for LEGO Mindstorms NXT ultrasonic sensor
+        self.declare_parameters(namespace="", parameters=[
+            ('field_of_view', 0.5235988),  # 30 degrees
+            ('min_range', 0.07),  # meters
+            ('max_range', 2.54)])  # meters
 
-        self._sensor = comm.get_sensor(port, nxt.sensor.generic.Ultrasonic)
+        self._sensor = brick.get_sensor(port, nxt.sensor.generic.Ultrasonic)
 
         self._publisher = self.create_publisher(
-            sensor_msgs.msg.Range, 'ultrasonic_sensor', 10)
+            sensor_msgs.msg.Range, name, 10)
 
         timer_period = 0.3  # seconds
         self._timer = self.create_timer(timer_period, self.measure)
@@ -73,18 +75,18 @@ class UltraSonicSensor(rclpy.node.Node):
 
         self._publisher.publish(msg)
 
-    def destroy(self):
+    def destroy_node(self):
         return super().destroy_node()
 
 
 class ColorSensor(rclpy.node.Node):
-    def __init__(self, comm: nxt.brick.Brick, port: nxt.sensor.Port):
-        super().__init__('color_sensor')
+    def __init__(self, brick: nxt.brick.Brick, name: str, port: nxt.sensor.Port):
+        super().__init__(name)
 
-        self._sensor = comm.get_sensor(port, nxt.sensor.generic.Color)
+        self._sensor = brick.get_sensor(port, nxt.sensor.generic.Color)
 
         self._publisher = self.create_publisher(
-            nxt_msgs2.msg.Color, 'color_sensor', 10)
+            nxt_msgs2.msg.Color, name, 10)
 
         timer_period = 0.3  # seconds
         self._timer = self.create_timer(timer_period, self.measure)
@@ -97,7 +99,7 @@ class ColorSensor(rclpy.node.Node):
 
         self._publisher.publish(msg)
 
-    def destroy(self):
+    def destroy_node(self):
         self._sensor.set_light_color(nxt.sensor.Type.COLOR_EXIT)
         return super().destroy_node()
 
@@ -133,13 +135,13 @@ class ColorSensor(rclpy.node.Node):
 
 
 class ReflectedLightSensor(rclpy.node.Node):
-    def __init__(self, comm: nxt.brick.Brick, port: nxt.sensor.Port):
-        super().__init__("reflected_light_sensor")
+    def __init__(self, brick: nxt.brick.Brick, name: str, port: nxt.sensor.Port):
+        super().__init__(name)
 
-        self._sensor = comm.get_sensor(port, nxt.sensor.generic.Color)
+        self._sensor = brick.get_sensor(port, nxt.sensor.generic.Color)
 
         self._publisher = self.create_publisher(
-            nxt_msgs2.msg.Color, 'reflected_light_sensor', 10)
+            nxt_msgs2.msg.Color, name, 10)
 
         self.declare_parameter('rgb_color', [0.0, 0.0, 0.0])
         self.add_on_set_parameters_callback(self.set_rgb_color_param)
@@ -188,38 +190,88 @@ class ReflectedLightSensor(rclpy.node.Node):
         else:
             return nxt.sensor.Type.COLOR_EXIT
 
-    def destroy(self):
+    def destroy_node(self):
         self._sensor.set_light_color(nxt.sensor.Type.COLOR_EXIT)
         return super().destroy_node()
+
+
+class NxtRos2Setup(rclpy.node.Node):
+    """Helper node to read ros2 parameters required for setting up the device-nodes"""
+
+    def __init__(self):
+        super().__init__("nxt_ros_setup", allow_undeclared_parameters=True,
+                         automatically_declare_parameters_from_overrides=True)
+
+    def get_sensor_configs(self, brick: nxt.brick.Brick) -> List[rclpy.node.Node]:
+        sensor_nodes: List[rclpy.node.Node] = []
+        for port_int in range(1, 5):  # NXT sensor ports (1-4)
+            sensor_params: Dict[str, rclpy.Parameter] = self.get_parameters_by_prefix(
+                str(port_int))
+
+            if 'type' in sensor_params and 'name' in sensor_params:
+                type = sensor_params['type'].value
+                name = sensor_params['name'].value
+
+                if name not in map(lambda node: node.get_name(), sensor_nodes):
+                    port_enum = self.int_to_sensor_port_enum(port_int)
+                    if type == "touch":
+                        sensor_nodes.append(
+                            TouchSensor(brick, name, port_enum))
+                    elif type == "ultrasonic":
+                        sensor_nodes.append(UltraSonicSensor(
+                            brick, name, port_enum))
+                    elif type == "color":
+                        sensor_nodes.append(
+                            ColorSensor(brick, name, port_enum))
+                    elif type == "reflected_light":
+                        sensor_nodes.append(ReflectedLightSensor(
+                            brick, name, port_enum))
+                    else:
+                        raise Exception(
+                            "Invalid sensor type in config parameters: %s" % type)
+
+                    self.get_logger().info("Created %s sensor with node name %s on port %s" %
+                                           (type, name, port_enum))
+                else:
+                    raise Exception(
+                        "Duplicate node name in config parameters: %s" % name)
+
+        return sensor_nodes
+
+    def int_to_sensor_port_enum(self, port: int) -> nxt.sensor.Port:
+        if port == 1:
+            return nxt.sensor.Port.S1
+        elif port == 2:
+            return nxt.sensor.Port.S2
+        elif port == 3:
+            return nxt.sensor.Port.S3
+        elif port == 4:
+            return nxt.sensor.Port.S4
+        else:
+            raise Exception("Invalid port in config parameters")
 
 
 def main(args=None):
     rclpy.init(args=args)
 
     try:
-        with nxt.locator.find() as b:
-            touch_sensor = TouchSensor(b, nxt.sensor.Port.S1)
-            ultrasonic_sensor = UltraSonicSensor(b, nxt.sensor.Port.S4)
-            # color_sensor = ColorSensor(
-            #     b, nxt.sensor.Port.S3)
-            reflected_light_sensor = ReflectedLightSensor(
-                b, nxt.sensor.Port.S3)
-
+        with nxt.locator.find() as brick:
+            setup_node = NxtRos2Setup()
+            sensor_nodes = setup_node.get_sensor_configs(setup_node, brick)
             executor = rclpy.executors.MultiThreadedExecutor()
-            executor.add_node(touch_sensor)
-            executor.add_node(ultrasonic_sensor)
-            # executor.add_node(color_sensor)
-            executor.add_node(reflected_light_sensor)
+
+            for sensor_node in sensor_nodes:
+                executor.add_node(sensor_node)
+
+            setup_node.destroy_node()  # Only required for setup
 
             try:
                 executor.spin()
             finally:
-                executor.shutdown()
+                for node in executor.get_nodes():
+                    node.destroy_node()
 
-                touch_sensor.destroy()
-                ultrasonic_sensor.destroy()
-                # color_sensor.destroy()
-                reflected_light_sensor.destroy()
+                executor.shutdown()
 
     finally:
         rclpy.shutdown()

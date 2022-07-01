@@ -1,0 +1,27 @@
+# Define ports (1-4 or A, B or C), device types and node/topic names
+/nxt_ros_setup:
+  ros__parameters:
+    1:
+      type: touch
+      name: touch_sensor1
+    3:
+      type: reflected_light
+      name: reflected_light_sensor1
+    4:
+      type: ultrasonic
+      name: ultrasonic_sensor1
+
+# Define node specific/local parameters (has to match with name above)
+/ultrasonic_sensor1:
+  ros__parameters:
+    # Default values for LEGO Mindstorms NXT 2.0 ultrasonic sensor
+    field_of_view: 0.5235988 # 30 degrees
+    max_range: 2.54 # meters
+    min_range: 0.07 # meters
+
+/reflected_light_sensor1:
+  ros__parameters:
+    rgb_color:
+      - 0.0
+      - 0.0
+      - 0.0
