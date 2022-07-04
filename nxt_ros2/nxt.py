@@ -14,7 +14,7 @@ import nxt.brick
 import nxt.sensor
 import nxt.sensor.generic
 
-from typing import Dict, List
+from typing import Dict, List, Union
 
 
 class TouchSensor(rclpy.node.Node):
@@ -198,43 +198,48 @@ class ReflectedLightSensor(rclpy.node.Node):
 class NxtRos2Setup(rclpy.node.Node):
     """Helper node to read ros2 parameters required for setting up the device-nodes"""
 
-    def __init__(self):
+    def __init__(self, brick: nxt.brick.Brick):
+        self._brick = brick
+
         super().__init__("nxt_ros_setup", allow_undeclared_parameters=True,
                          automatically_declare_parameters_from_overrides=True)
 
-    def get_sensor_configs(self, brick: nxt.brick.Brick) -> List[rclpy.node.Node]:
-        sensor_nodes: List[rclpy.node.Node] = []
+    def get_sensor_configs(self) -> List[rclpy.node.Node]:
+        sensor_nodes: List[Union[TouchSensor, UltraSonicSensor,
+                                 ColorSensor, ReflectedLightSensor]] = []
         for port_int in range(1, 5):  # NXT sensor ports (1-4)
             sensor_params: Dict[str, rclpy.Parameter] = self.get_parameters_by_prefix(
                 str(port_int))
 
-            if 'type' in sensor_params and 'name' in sensor_params:
-                type = sensor_params['type'].value
-                name = sensor_params['name'].value
+            if 'sensor_type' in sensor_params and 'sensor_name' in sensor_params:
+                sensor_type = sensor_params['sensor_type'].value
+                sensor_node_name = sensor_params['sensor_name'].value
+                sensor_node_names = map(
+                    lambda node: node.get_name(), sensor_nodes)
 
-                if name not in map(lambda node: node.get_name(), sensor_nodes):
+                if sensor_node_name not in sensor_node_names:
                     port_enum = self.int_to_sensor_port_enum(port_int)
-                    if type == "touch":
+                    if sensor_type == "touch":
                         sensor_nodes.append(
-                            TouchSensor(brick, name, port_enum))
-                    elif type == "ultrasonic":
+                            TouchSensor(self._brick, sensor_node_name, port_enum))
+                    elif sensor_type == "ultrasonic":
                         sensor_nodes.append(UltraSonicSensor(
-                            brick, name, port_enum))
-                    elif type == "color":
+                            self._brick, sensor_node_name, port_enum))
+                    elif sensor_type == "color":
                         sensor_nodes.append(
-                            ColorSensor(brick, name, port_enum))
-                    elif type == "reflected_light":
+                            ColorSensor(self._brick, sensor_node_name, port_enum))
+                    elif sensor_type == "reflected_light":
                         sensor_nodes.append(ReflectedLightSensor(
-                            brick, name, port_enum))
+                            self._brick, sensor_node_name, port_enum))
                     else:
                         raise Exception(
-                            "Invalid sensor type in config parameters: %s" % type)
+                            "Invalid sensor type in config parameters: %s" % sensor_type)
 
-                    self.get_logger().info("Created %s sensor with node name %s on port %s" %
-                                           (type, name, port_enum))
+                    self.get_logger().info("Created %s sensor with node name '%s' on port '%s'" %
+                                           (sensor_type, sensor_node_name, port_enum))
                 else:
                     raise Exception(
-                        "Duplicate node name in config parameters: %s" % name)
+                        "Duplicate sensor name in config parameters: %s" % sensor_node_name)
 
         return sensor_nodes
 
@@ -248,7 +253,7 @@ class NxtRos2Setup(rclpy.node.Node):
         elif port == 4:
             return nxt.sensor.Port.S4
         else:
-            raise Exception("Invalid port in config parameters")
+            raise Exception("Invalid sensor port in config parameters")
 
 
 def main(args=None):
@@ -256,8 +261,8 @@ def main(args=None):
 
     try:
         with nxt.locator.find() as brick:
-            setup_node = NxtRos2Setup()
-            sensor_nodes = setup_node.get_sensor_configs(setup_node, brick)
+            setup_node = NxtRos2Setup(brick)
+            sensor_nodes = setup_node.get_sensor_configs()
             executor = rclpy.executors.MultiThreadedExecutor()
 
             for sensor_node in sensor_nodes:
