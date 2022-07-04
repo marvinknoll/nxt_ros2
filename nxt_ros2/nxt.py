@@ -1,6 +1,9 @@
 import rclpy
 import rclpy.executors
 import rclpy.node
+import rclpy.time
+import rclpy.duration
+import rclpy.clock
 import rclpy.callback_groups
 import rcl_interfaces.msg
 
@@ -16,6 +19,7 @@ import nxt.sensor.generic
 import nxt.motor
 
 from typing import Dict, List, Union
+import math
 
 
 class TouchSensor(rclpy.node.Node):
@@ -202,6 +206,55 @@ class Motor(rclpy.node.Node):
 
         self._port = port
         self._motor = brick.get_motor(port)
+        self._last_js = None
+        self._effort = 0
+        self._POWER_TO_NM = 0.01
+
+        self._motor.reset_position(False)
+
+        self._jc_subscriber = self.create_subscription(
+            nxt_msgs2.msg.JointEffort, "joint_effort", self.joint_effort_cb, 10)
+
+        self._js_publisher = self.create_publisher(
+            sensor_msgs.msg.JointState, "joint_state", 10)
+
+        timer_period = 0.1  # seconds
+        self.create_timer(timer_period, self.motor_cb)
+
+    def joint_effort_cb(self, msg: nxt_msgs2.msg.JointEffort):
+        if msg.joint_name == self.get_name():
+            self._effort = msg.effort
+
+    def motor_cb(self):
+        tacho = self._motor.get_tacho()
+        now = self.get_clock().now()
+        position_rad = math.radians(tacho.rotation_count)
+        joint_name = self.get_name()
+        joint_effort = self._effort * self._POWER_TO_NM
+        velocity = 0
+
+        if self._last_js:
+            last_stamp = self._last_js.header.stamp
+            last_js_now = rclpy.time.Time(seconds=last_stamp.sec,
+                                          nanoseconds=last_stamp.nanosec,
+                                          clock_type=rclpy.clock.ClockType.ROS_TIME)
+
+            deltaSeconds = (now - last_js_now).nanoseconds/1000000000
+            deltaPosition = position_rad - self._last_js.position[0]
+
+            velocity = (deltaPosition / deltaSeconds)
+
+        js = sensor_msgs.msg.JointState()
+        js.header.stamp = now.to_msg()
+        js.name.append(joint_name)
+        js.effort.append(joint_effort)
+        js.position.append(position_rad)
+        js.velocity.append(velocity)
+
+        self._js_publisher.publish(js)
+        self._last_js = js
+
+        self._motor.run(int(self._effort), True)
 
     def destroy_node(self):
         self._motor.idle()
