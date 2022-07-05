@@ -1,6 +1,7 @@
 import rclpy
 import rclpy.executors
 import rclpy.node
+import rclpy.action
 import rclpy.time
 import rclpy.duration
 import rclpy.clock
@@ -8,6 +9,7 @@ import rclpy.callback_groups
 import rcl_interfaces.msg
 
 import nxt_msgs2.msg
+import nxt_msgs2.action
 import sensor_msgs.msg
 import std_msgs.msg
 
@@ -20,6 +22,7 @@ import nxt.motor
 
 from typing import Dict, List, Union
 import math
+import threading
 
 
 class TouchSensor(rclpy.node.Node):
@@ -210,6 +213,11 @@ class Motor(rclpy.node.Node):
         self._effort = 0
         self._POWER_TO_NM = 0.01
 
+        self._action_start_rad = 0
+        self._goal_handle = None
+        self._goal_lock = threading.Lock()
+        self._turning_lock = threading.Lock()
+
         self._motor.reset_position(False)
 
         self._jc_subscriber = self.create_subscription(
@@ -221,14 +229,22 @@ class Motor(rclpy.node.Node):
         timer_period = 0.1  # seconds
         self.create_timer(timer_period, self.motor_cb)
 
+        self._action_server = rclpy.action.ActionServer(
+            self,
+            nxt_msgs2.action.TurnMotor,
+            self.get_name() + '_turn',
+            goal_callback=self.goal_callback,
+            handle_accepted_callback=self.handle_accepted_callback,
+            execute_callback=self.execute_callback,
+            cancel_callback=self.cancel_callback)
+
     def joint_effort_cb(self, msg: nxt_msgs2.msg.JointEffort):
         if msg.joint_name == self.get_name():
             self._effort = msg.effort
 
     def motor_cb(self):
-        tacho = self._motor.get_tacho()
         now = self.get_clock().now()
-        position_rad = math.radians(tacho.rotation_count)
+        position_rad = self.get_motor_position()
         joint_name = self.get_name()
         joint_effort = self._effort * self._POWER_TO_NM
         velocity = 0
@@ -254,10 +270,75 @@ class Motor(rclpy.node.Node):
         self._js_publisher.publish(js)
         self._last_js = js
 
-        self._motor.run(int(self._effort), True)
+        if not self._turning_lock.locked():
+            self._motor.run(int(self._effort), True)
+        elif self._goal_handle is not None and self._goal_handle.is_active:
+            feedback_msg = nxt_msgs2.action.TurnMotor.Feedback()
+            feedback_msg.header.stamp = self.get_clock().now().to_msg()
+            feedback_msg.start_position = self._action_start_rad
+            feedback_msg.current_position = position_rad
+            self._goal_handle.publish_feedback(feedback_msg)
+
+    def get_motor_position(self):
+        return math.radians(self._motor.get_tacho().rotation_count)
+
+    def goal_callback(self, goal_request):
+        return rclpy.action.GoalResponse.ACCEPT
+
+    def handle_accepted_callback(self, goal_handle):
+        with self._goal_lock:
+            if self._goal_handle is not None and self._goal_handle.is_active:
+                self._goal_handle.abort()
+                self.get_logger().info(
+                    "Motor.turn action: cancelling previous and accepting new goal (motor port: %s)" % self._port)
+            else:
+                self.get_logger().info("Motor.turn: action goal accepted (motor port: %s)" % self._port)
+
+            self._goal_handle = goal_handle
+
+        goal_handle.execute()
+
+    def execute_callback(self, goal_handle):
+        with self._turning_lock:
+            req = goal_handle.request
+            self._action_start_rad = self.get_motor_position()
+
+            def stop_turn(): return goal_handle.is_cancel_requested and goal_handle.is_active
+            motor_turn_thread = threading.Thread(target=self._motor.turn, kwargs={'power': req.power,
+                                                                                  'tacho_units': math.degrees(req.tacho_units),
+                                                                                  'brake': req.brake,
+                                                                                  'timeout': req.timeout,
+                                                                                  'emulate': req.emulate,
+                                                                                  'stop_turn': stop_turn})
+
+            motor_turn_thread.start()
+            motor_turn_thread.join()
+
+            end_rad = self.get_motor_position()
+
+            if not goal_handle.is_active:
+                self.get_logger().info("Motor.turn action: goal aborted (motor port: %s)" % self._port)
+                return nxt_msgs2.action.TurnMotor.Result()
+
+            if goal_handle.is_cancel_requested:
+                goal_handle.canceled()
+                self.get_logger().info("Motor.turn: action: goal canceled (motor port: %s)" % self._port)
+                return nxt_msgs2.action.TurnMotor.Result()
+
+            goal_handle.succeed()
+
+            result = nxt_msgs2.action.TurnMotor.Result()
+            result.header.stamp = self.get_clock().now().to_msg()
+            result.start_position = self._action_start_rad
+            result.end_position = end_rad
+            return result
+
+    def cancel_callback(self, cancel_request):
+        return rclpy.action.CancelResponse.ACCEPT
 
     def destroy_node(self):
         self._motor.idle()
+        self._action_server.destroy()
         return super().destroy_node()
 
 
