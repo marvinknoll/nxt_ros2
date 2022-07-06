@@ -10,6 +10,7 @@ import rcl_interfaces.msg
 
 import nxt_msgs2.msg
 import nxt_msgs2.action
+import nxt_msgs2.srv
 import sensor_msgs.msg
 import std_msgs.msg
 
@@ -374,6 +375,10 @@ class NxtRos2Setup(rclpy.node.Node):
         super().__init__("nxt_ros_setup", allow_undeclared_parameters=True,
                          automatically_declare_parameters_from_overrides=True)
 
+        service_name = self.get_name() + '/get_available_motor_configs'
+        self._motor_names_service = self.create_service(
+            nxt_msgs2.srv.MotorConfigs, service_name, self.get_available_motor_configs)
+
     # Sensors
     def get_sensor_configs_from_parameters(self) -> SensorConfigs:
         valid_sensor_ports = ["1", "2", "3", "4"]
@@ -554,6 +559,16 @@ class NxtRos2Setup(rclpy.node.Node):
         self.check_motor_configs(motor_configs)
         motor_nodes = self.create_motor_nodes(self._brick, motor_configs)
         return motor_nodes
+
+    def get_available_motor_configs(self, request, response):
+        motor_configs = self.get_motor_configs_from_parameters()
+        response.header.stamp = self.get_clock().now().to_msg()
+        response.motor_names = motor_configs.motor_names
+        response.motor_mimic_names = motor_configs.motor_mimic_names
+        response.motor_mimic_gear_ratios = motor_configs.motor_mimic_gear_ratios
+        response.motor_ports = motor_configs.motor_ports
+        response.motor_types = motor_configs.motor_types
+        return response
 
     def string_to_motor_port_enum(self, port: str) -> nxt.motor.Port:
         if port == "A":
