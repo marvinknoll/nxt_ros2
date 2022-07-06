@@ -23,6 +23,29 @@ import nxt.motor
 from typing import Dict, List, Union
 import math
 import threading
+import enum
+
+
+class MotorType(enum.Enum):
+    wheel_motor_r = "wheel_motor_r"
+    wheel_motor_l = "wheel_motor_l"
+    other = "other"
+
+
+class SensorConfigs:
+    def __init__(self):
+        self.sensor_names: List[str] = []
+        self.sensor_types: List[str] = []
+        self.sensor_ports: List[str] = []
+
+
+class MotorConfigs:
+    def __init__(self):
+        self.motor_ports: List[str] = []
+        self.motor_names: List[str] = []
+        self.motor_types: List[str] = []
+        self.motor_mimic_names: List[str] = []
+        self.motor_mimic_gear_ratios: List[int] = []
 
 
 class TouchSensor(rclpy.node.Node):
@@ -351,114 +374,185 @@ class NxtRos2Setup(rclpy.node.Node):
         super().__init__("nxt_ros_setup", allow_undeclared_parameters=True,
                          automatically_declare_parameters_from_overrides=True)
 
-    def get_sensor_configs(self) -> List[rclpy.node.Node]:
+    # Sensors
+    def get_sensor_configs_from_parameters(self) -> SensorConfigs:
+        valid_sensor_ports = ["1", "2", "3", "4"]
+        required_sensor_params = {"sensor_type", "sensor_name"}
+
+        sensor_configs = SensorConfigs()
+
+        for port_str in valid_sensor_ports:
+            sensor_params: Dict[str, rclpy.Parameter] = self.get_parameters_by_prefix(
+                port_str)
+
+            if sensor_params == {}:
+                # No sensor defined for this port
+                continue
+
+            if not sensor_params.keys() >= required_sensor_params:
+                raise Exception(
+                    "Missing or invalid sensor config parameters for sensor '%s', required: %s" % (port_str, required_sensor_params))
+
+            sensor_configs.sensor_ports.append(port_str)
+            sensor_configs.sensor_types.append(
+                sensor_params['sensor_type'].value)
+            sensor_configs.sensor_names.append(
+                sensor_params['sensor_name'].value)
+
+        return sensor_configs
+
+    def check_sensor_configs(self, sensor_configs: SensorConfigs):
+        valid_sensor_types = [
+            "touch", "ultrasonic", "color", "reflected_light"]
+
+        for i in range(len(sensor_configs.sensor_names)):
+            sensor_name = sensor_configs.sensor_names[i]
+            sensor_port = sensor_configs.sensor_ports[i]
+            sensor_type = sensor_configs.sensor_types[i]
+
+            if sensor_configs.sensor_ports.count(sensor_port) > 1:
+                raise Exception(
+                    "Duplicate sensor_port '%s' in config parameters" % sensor_port)
+            if sensor_configs.sensor_names.count(sensor_name) > 1:
+                raise Exception(
+                    "Duplicate sensor_name '%s' in config parameters" % sensor_name)
+            if sensor_type not in valid_sensor_types:
+                raise Exception(
+                    "Invalid sensor_type '%s' config for sensor on port: '%s'. Valid sensor_type's: %s" % (sensor_type, sensor_port, valid_sensor_types))
+
+    # TODO Refactor sensors to extend a Sensor class
+    def create_sensor_nodes(self, brick: nxt.brick.Brick, sensor_configs: SensorConfigs) -> List[Union[TouchSensor, UltraSonicSensor,
+                                                                                                       ColorSensor, ReflectedLightSensor]]:
         sensor_nodes: List[Union[TouchSensor, UltraSonicSensor,
                                  ColorSensor, ReflectedLightSensor]] = []
-        for port_int in range(1, 5):  # NXT sensor ports (1-4)
-            sensor_params: Dict[str, rclpy.Parameter] = self.get_parameters_by_prefix(
-                str(port_int))
 
-            if 'sensor_type' in sensor_params and 'sensor_name' in sensor_params:
-                sensor_type = sensor_params['sensor_type'].value
-                sensor_node_name = sensor_params['sensor_name'].value
-                sensor_node_names = map(
-                    lambda node: node.get_name(), sensor_nodes)
+        for i in range(len(sensor_configs.sensor_names)):
+            sensor_name = sensor_configs.sensor_names[i]
+            sensor_port_str = sensor_configs.sensor_ports[i]
+            sensor_port_enum = self.str_to_sensor_port_enum(sensor_port_str)
+            sensor_type = sensor_configs.sensor_types[i]
 
-                if sensor_node_name not in sensor_node_names:
-                    port_enum = self.int_to_sensor_port_enum(port_int)
-                    if sensor_type == "touch":
-                        sensor_nodes.append(
-                            TouchSensor(self._brick, sensor_node_name, port_enum))
-                    elif sensor_type == "ultrasonic":
-                        sensor_nodes.append(UltraSonicSensor(
-                            self._brick, sensor_node_name, port_enum))
-                    elif sensor_type == "color":
-                        sensor_nodes.append(
-                            ColorSensor(self._brick, sensor_node_name, port_enum))
-                    elif sensor_type == "reflected_light":
-                        sensor_nodes.append(ReflectedLightSensor(
-                            self._brick, sensor_node_name, port_enum))
-                    else:
-                        raise Exception(
-                            "Invalid sensor type in config parameters: %s" % sensor_type)
+            if sensor_type == "touch":
+                sensor_nodes.append(TouchSensor(
+                    brick, sensor_name, sensor_port_enum))
+            elif sensor_type == "ultrasonic":
+                sensor_nodes.append(UltraSonicSensor(
+                    brick, sensor_name, sensor_port_enum))
+            elif sensor_type == "color":
+                sensor_nodes.append(ColorSensor(
+                    brick, sensor_name, sensor_port_enum))
+            elif sensor_type == "reflected_light":
+                sensor_nodes.append(ReflectedLightSensor(
+                    brick, sensor_name, sensor_port_enum))
 
-                    self.get_logger().info("Created %s sensor with node name '%s' on port '%s'" %
-                                           (sensor_type, sensor_node_name, port_enum))
-                else:
-                    raise Exception(
-                        "Duplicate sensor name in config parameters: %s" % sensor_node_name)
+            self.get_logger().info("Created sensor of type '%s' with node name '%s' on port '%s'" %
+                                   (sensor_type, sensor_name, sensor_port_enum))
 
         return sensor_nodes
 
-    def int_to_sensor_port_enum(self, port: int) -> nxt.sensor.Port:
-        if port == 1:
+    def create_and_get_sensor_nodes(self) -> List[Union[TouchSensor, UltraSonicSensor,
+                                                        ColorSensor, ReflectedLightSensor]]:
+        sensor_configs = self.get_sensor_configs_from_parameters()
+        self.check_sensor_configs(sensor_configs)
+        sensor_nodes = self.create_sensor_nodes(self._brick, sensor_configs)
+        return sensor_nodes
+
+    def str_to_sensor_port_enum(self, port: int) -> nxt.sensor.Port:
+        if port == "1":
             return nxt.sensor.Port.S1
-        elif port == 2:
+        elif port == "2":
             return nxt.sensor.Port.S2
-        elif port == 3:
+        elif port == "3":
             return nxt.sensor.Port.S3
-        elif port == 4:
+        elif port == "4":
             return nxt.sensor.Port.S4
         else:
             raise Exception("Invalid sensor port in config parameters")
 
-    def get_motor_configs(self) -> List[Motor]:
-        motor_nodes: List[Motor] = []
+    # Motors
 
-        valid_ports = ["A", "B", "C"]
-        valid_motor_types = ['wheel_motor_r', 'wheel_motor_l', 'other']
-        required_motor_params = {'motor_joint_name', 'motor_type',
-                                 'mimic_joint_name', 'motor_mimic_gear_ratio'}
-        used_mimic_joint_names: List[str] = []
-        used_motor_types: List[str] = []
+    def get_motor_configs_from_parameters(self) -> MotorConfigs:
+        valid_motor_ports = ["A", "B", "C"]
+        required_motor_params = {'motor_name', 'motor_type',
+                                 'motor_mimic_name', 'motor_mimic_gear_ratio'}
 
-        for port_str in valid_ports:
+        motor_configs = MotorConfigs()
+
+        for port_str in valid_motor_ports:
             motor_params: Dict[str, rclpy.Parameter] = self.get_parameters_by_prefix(
                 port_str)
+
+            if motor_params == {}:
+                # No motor defined for this port
+                continue
 
             if not motor_params.keys() >= required_motor_params:
                 raise Exception(
                     "Missing or invalid motor config parameters for motor '%s', required: %s" % (port_str, required_motor_params))
 
-            motor_type = motor_params['motor_type'].value
-            motor_joint_name = motor_params['motor_joint_name'].value
-            mimic_joint_name = motor_params['mimic_joint_name'].value
+            motor_configs.motor_ports.append(port_str)
+            motor_configs.motor_names.append(
+                motor_params['motor_name'].value)
+            motor_configs.motor_types.append(motor_params['motor_type'].value)
+            motor_configs.motor_mimic_names.append(
+                motor_params['motor_mimic_name'].value)
+            motor_configs.motor_mimic_gear_ratios.append(
+                motor_params['motor_mimic_gear_ratio'].value)
+
+        return motor_configs
+
+    def check_motor_configs(self, motor_configs: MotorConfigs):
+        valid_motor_types = ['wheel_motor_r', 'wheel_motor_l', 'other']
+
+        for i in range(len(motor_configs.motor_names)):
+            motor_port = motor_configs.motor_ports[i]
+            motor_name = motor_configs.motor_names[i]
+            motor_mimic_name = motor_configs.motor_mimic_names[i]
+            motor_type = motor_configs.motor_types[i]
+
+            if motor_configs.motor_names.count(motor_name) > 1:
+                raise Exception(
+                    "Duplicate motor_name '%s' in config parameters" % motor_name)
+
+            if motor_configs.motor_mimic_names.count(motor_mimic_name) > 1:
+                raise Exception(
+                    "Duplicate motor_mimic_name '%s' in config parameters" % motor_mimic_name)
+
+            if motor_configs.motor_ports.count(motor_port) > 1:
+                raise Exception(
+                    "Duplicate motor_port '%s' in config parameters" % motor_port)
 
             if motor_type not in valid_motor_types:
                 raise Exception(
-                    "Invalid motor_type config: '%s' for motor '%s'. Please use one of the following: %s" % (motor_type, port_str, valid_motor_types))
+                    "Invalid config motor_type: '%s' for motor on port: '%s'. Valid motor_type's: %s" % (motor_type, motor_port, valid_motor_types))
 
-            motor_joint_names = map(lambda node: node.get_name(), motor_nodes)
-
-            if motor_joint_name in motor_joint_names:
-                raise Exception(
-                    "Duplicate motor_joint_name in config parameters: %s" % motor_joint_name)
-
-            if mimic_joint_name in used_mimic_joint_names:
-                raise Exception(
-                    "Duplicate mimic_joint_name in config parameters: %s" % mimic_joint_name)
-
-            port_enum = self.string_to_motor_port_enum(
-                port_str)
-
-            motor_nodes.append(
-                Motor(self._brick, motor_joint_name, port_enum))
-
-            used_mimic_joint_names.append(mimic_joint_name)
-            used_motor_types.append(motor_type)
-
-        # If you define the wheel motor for one side, you must also define one for the opposite side for the 2-wheel differential drive controller to work
-        if 'wheel_motor_r' in used_motor_types and 'wheel_motor_l' not in used_motor_types:
+        if 'wheel_motor_r' in motor_configs.motor_types and 'wheel_motor_l' not in motor_configs.motor_types:
             raise Exception(
-                "If you define a motor with motor_type 'wheel_motor_r', please also define one with motor_type: 'wheel_motor_l'")
-        if 'wheel_motor_l' in used_motor_types and 'wheel_motor_r' not in used_motor_types:
+                "If you define a motor with motor_type 'wheel_motor_r', please also define one with motor_type: 'wheel_motor_l'. Otherwise config all motor_types as 'other'")
+        if 'wheel_motor_l' in motor_configs.motor_types and 'wheel_motor_r' not in motor_configs.motor_types:
             raise Exception(
-                "If you define a motor with motor_type 'wheel_motor_l', please also define one with motor_type:'wheel_motor_r'")
+                "If you define a motor with motor_type 'wheel_motor_l', please also define one with motor_type: 'wheel_motor_r'. Otherwise config all motor_types as 'other'")
 
-        for motor_node in motor_nodes:
-            self.get_logger().info("Created motor with node name '%s' on port '%s'" %
-                                   (motor_node.get_name(), motor_node._port))
+    def create_motor_nodes(self, brick: nxt.brick.Brick, motor_configs: MotorConfigs) -> List[Motor]:
+        motor_nodes: List[Motor] = []
+        for i in range(len(motor_configs.motor_names)):
+            motor_name = motor_configs.motor_names[i]
+            motor_port_str = motor_configs.motor_ports[i]
+            motor_port_enum = self.string_to_motor_port_enum(
+                motor_port_str)
+            motor_type = motor_configs.motor_types[i]
 
+            motor_nodes.append(Motor(brick, motor_name, motor_port_enum))
+
+            self.get_logger().info("Created motor of type '%s' with node name '%s' on port '%s'" %
+                                   (motor_type, motor_name, motor_port_enum))
+
+        return motor_nodes
+
+    def create_and_get_motor_nodes(self) -> List[Motor]:
+        motor_configs = self.get_motor_configs_from_parameters()
+        self.check_motor_configs(motor_configs)
+        motor_nodes = self.create_motor_nodes(self._brick, motor_configs)
         return motor_nodes
 
     def string_to_motor_port_enum(self, port: str) -> nxt.motor.Port:
@@ -471,15 +565,20 @@ class NxtRos2Setup(rclpy.node.Node):
         else:
             raise Exception("Invalid motor port in config parameters")
 
+    # General
     def check_ports_config_parameters(self) -> bool:
-        validPorts: List[Union[str, int]] = [1, 2, 3, 4, "A", "B", "C"]
-        params = self.get_parameters_by_prefix("")
-        params = map(lambda param: param.split(".")[0], params)
-        params = filter(lambda param: param != 'use_sim_time', params)
+        valid_motor_ports: List[str] = ["A", "B", "C"]
+        valid_sensor_ports: List[str] = ["1", "2", "3", "4"]
 
-        for params in params:
-            if params not in map(lambda port: str(port), validPorts):
-                raise Exception("Invalid port config parameter: %s" % params)
+        params = self.get_parameters_by_prefix("")
+        params = list(map(lambda param: param.split(".")[0], params))
+        ports = list(
+            set(filter(lambda port: port != 'use_sim_time', params)))
+
+        for port in ports:
+            if port not in valid_motor_ports and port not in valid_sensor_ports:
+                raise Exception(
+                    "Invalid port '%s' in config! (Valid motor ports: %s. Valid sensor ports: %s)" % (port, valid_motor_ports, valid_sensor_ports))
 
 
 def main(args=None):
@@ -495,11 +594,12 @@ def main(args=None):
 
             try:
                 setup_node.check_ports_config_parameters()
-                nodes.extend(setup_node.get_sensor_configs())
-                nodes.extend(setup_node.get_motor_configs())
+                nodes.extend(setup_node.create_and_get_sensor_nodes())
+                nodes.extend(setup_node.create_and_get_motor_nodes())
 
                 for node in nodes:
                     executor.add_node(node)
+                executor.add_node(setup_node)
 
                 executor.spin()
             finally:
