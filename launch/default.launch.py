@@ -21,11 +21,16 @@ def generate_launch_description():
     )
 
     nxt_node = Node(package='nxt_ros2',
-                    executable='nxt',
+                    executable='nxt_ros',
                     parameters=[LaunchConfiguration('device_config_file')]
                     )
 
+    joint_state_aggregator_node = Node(package='nxt_ros2',
+                                       executable='js_aggregator',
+                                       parameters=[LaunchConfiguration('device_config_file')])
+
     return LaunchDescription([
         devices_config_file,
-        nxt_node
+        nxt_node,
+        joint_state_aggregator_node
     ])

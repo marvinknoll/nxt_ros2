@@ -30,7 +30,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'nxt = nxt_ros2.nxt:main'
+            'nxt_ros = nxt_ros2.nxt_ros:main',
+            'js_aggregator = nxt_ros2.joint_state_aggregator:main'
         ],
     },
 )

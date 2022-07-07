@@ -42,3 +42,7 @@
       - 0.0
       - 0.0
       - 0.0
+
+/joint_state_aggregator:
+  ros__parameters:
+    related_js_time_delta: 1000000000 # nanoseconds
