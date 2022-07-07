@@ -29,8 +29,13 @@ def generate_launch_description():
                                        executable='js_aggregator',
                                        parameters=[LaunchConfiguration('device_config_file')])
 
+    differential_drive_controller_node = Node(package='nxt_ros2',
+                                              executable='diff_drive_controller',
+                                              parameters=[LaunchConfiguration('device_config_file')])
+
     return LaunchDescription([
         devices_config_file,
         nxt_node,
-        joint_state_aggregator_node
+        joint_state_aggregator_node,
+        differential_drive_controller_node
     ])
