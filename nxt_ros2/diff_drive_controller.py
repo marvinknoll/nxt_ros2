@@ -35,7 +35,7 @@ class DiffDriveController(rclpy.node.Node):
         ])
 
         self._cmd_vel_subscriber = self.create_subscription(
-            geometry_msgs.msg.Twist, "cmd_vel", self.cmd_vel_cb, 10)
+            geometry_msgs.msg.TwistStamped, "cmd_vel", self.cmd_vel_cb, 10)
 
         self._joint_states_subscriber = self.create_subscription(
             sensor_msgs.msg.JointState, "joint_states", self.joint_states_cb, 10)
@@ -53,14 +53,15 @@ class DiffDriveController(rclpy.node.Node):
         motor_configs.motor_names = result.motor_names
         motor_configs.motor_mimic_gear_ratios = result.motor_mimic_gear_ratios
         motor_configs.motor_types = result.motor_types
+        motor_configs.invert_efforts = result.invert_efforts
 
         self.get_logger().info("Got available motors configurations from nxt_ros_setup node")
 
         return motor_configs
 
-    def cmd_vel_cb(self, msg: geometry_msgs.msg.Twist):
-        self._goal_lin_vel = msg.linear.x
-        self._goal_ang_vel = msg.angular.z
+    def cmd_vel_cb(self, msg: geometry_msgs.msg.TwistStamped):
+        self._goal_lin_vel = msg.twist.linear.x
+        self._goal_ang_vel = msg.twist.angular.z
 
     def joint_states_cb(self, msg: sensor_msgs.msg.JointState):
         motor_r_index = self._motor_configs.motor_types.index("wheel_motor_r")
@@ -69,6 +70,8 @@ class DiffDriveController(rclpy.node.Node):
         motor_l_name = self._motor_configs.motor_names[motor_l_index]
         motor_r_gear_ratio = self._motor_configs.motor_mimic_gear_ratios[motor_r_index]
         motor_l_gear_ratio = self._motor_configs.motor_mimic_gear_ratios[motor_l_index]
+        invert_effort_r = self._motor_configs.invert_efforts[motor_r_index]
+        invert_effort_l = self._motor_configs.invert_efforts[motor_l_index]
 
         if motor_r_name not in msg.name or motor_l_name not in msg.name:
             self.get_logger().warning(
@@ -87,11 +90,16 @@ class DiffDriveController(rclpy.node.Node):
         motor_r_vel = wheel_r_vel / motor_r_gear_ratio  # rad/s
         motor_l_vel = wheel_l_vel / motor_l_gear_ratio  # rad/s
 
+        motor_r_vel = motor_r_vel * -1 if invert_effort_r else motor_r_vel
+        motor_l_vel = motor_l_vel * -1 if invert_effort_l else motor_l_vel
+
         joint_effort_r = nxt_msgs2.msg.JointEffort()
+        joint_effort_r.header.stamp = self.get_clock().now().to_msg()
         joint_effort_r.joint_name = motor_r_name
         joint_effort_r.effort = motor_r_vel * rad_per_s_to_effort
 
         joint_effort_l = nxt_msgs2.msg.JointEffort()
+        joint_effort_l.header.stamp = self.get_clock().now().to_msg()
         joint_effort_l.joint_name = motor_l_name
         joint_effort_l.effort = motor_l_vel * rad_per_s_to_effort
 

@@ -20,11 +20,13 @@
       motor_name: wheel_motor_l
       motor_mimic_name: wheel_l
       motor_mimic_gear_ratio: -0.33333
+      invert_effort: true
     C:
       motor_type: wheel_motor_r
       motor_name: wheel_motor_r
       motor_mimic_name: wheel_r
       motor_mimic_gear_ratio: -0.33333
+      invert_effort: true
       # motor_mimic_gear_ratio > 0 -> mimic gear turns the same direction as the motor
       # motor_mimic_gear_ratio < 0 -> mimic gear turns in the opposite direction as the motor
 

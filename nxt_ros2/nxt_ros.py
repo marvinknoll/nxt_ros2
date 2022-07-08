@@ -47,6 +47,7 @@ class MotorConfigs:
         self.motor_types: List[str] = []
         self.motor_mimic_names: List[str] = []
         self.motor_mimic_gear_ratios: List[int] = []
+        self.invert_efforts: List[bool] = []
 
 
 class TouchSensor(rclpy.node.Node):
@@ -495,14 +496,26 @@ class NxtRos2Setup(rclpy.node.Node):
                 raise Exception(
                     "Missing or invalid motor config parameters for motor '%s', required: %s" % (port_str, required_motor_params))
 
+            motor_type = motor_params['motor_type'].value
+
             motor_configs.motor_ports.append(port_str)
+            motor_configs.motor_types.append(motor_type)
             motor_configs.motor_names.append(
                 motor_params['motor_name'].value)
-            motor_configs.motor_types.append(motor_params['motor_type'].value)
             motor_configs.motor_mimic_names.append(
                 motor_params['motor_mimic_name'].value)
             motor_configs.motor_mimic_gear_ratios.append(
                 motor_params['motor_mimic_gear_ratio'].value)
+
+            if motor_type == MotorType.wheel_motor_r.value or motor_type == MotorType.wheel_motor_l.value:
+                if "invert_effort" not in motor_params.keys() or not isinstance(motor_params['invert_effort'].value, bool):
+                    raise Exception(
+                        "Missing or invalid motor config parameter 'invert_effort: bool' for motor: '%s'" % port_str)
+                else:
+                    motor_configs.invert_efforts.append(
+                        motor_params['invert_effort'].value)
+            else:
+                motor_configs.invert_efforts.append(False)
 
         return motor_configs
 
@@ -568,6 +581,7 @@ class NxtRos2Setup(rclpy.node.Node):
         response.motor_mimic_gear_ratios = motor_configs.motor_mimic_gear_ratios
         response.motor_ports = motor_configs.motor_ports
         response.motor_types = motor_configs.motor_types
+        response.invert_efforts = motor_configs.invert_efforts
         return response
 
     def string_to_motor_port_enum(self, port: str) -> nxt.motor.Port:
