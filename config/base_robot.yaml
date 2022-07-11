@@ -1,34 +1,35 @@
 # Define ports (1-4 or A, B or C), device types and node/topic names
 /nxt_ros_setup:
   ros__parameters:
-    1:
-      sensor_type: touch
-      sensor_name: touch_sensor
-    3:
-      sensor_type: reflected_light
-      sensor_name: reflected_light_sensor
-    4:
-      sensor_type: ultrasonic
-      sensor_name: ultrasonic_sensor
-    A:
-      motor_type: other
-      motor_name: radar_motor
-      motor_mimic_name: radar
-      motor_mimic_gear_ratio: -0.33333
-    B:
-      motor_type: wheel_motor_l
-      motor_name: wheel_motor_l
-      motor_mimic_name: wheel_l
-      motor_mimic_gear_ratio: -0.33333
-      invert_effort: true
-    C:
-      motor_type: wheel_motor_r
-      motor_name: wheel_motor_r
-      motor_mimic_name: wheel_r
-      motor_mimic_gear_ratio: -0.33333
-      invert_effort: true
-      # motor_mimic_gear_ratio > 0 -> mimic gear turns the same direction as the motor
-      # motor_mimic_gear_ratio < 0 -> mimic gear turns in the opposite direction as the motor
+    devices:
+      1:
+        sensor_type: touch
+        sensor_name: touch_sensor
+      3:
+        sensor_type: reflected_light
+        sensor_name: reflected_light_sensor
+      4:
+        sensor_type: ultrasonic
+        sensor_name: ultrasonic_sensor
+      A:
+        motor_type: other
+        motor_name: radar_motor
+        motor_mimic_name: radar
+        motor_mimic_gear_ratio: -0.33333
+      B:
+        motor_type: wheel_motor_l
+        motor_name: wheel_motor_l
+        motor_mimic_name: wheel_l
+        motor_mimic_gear_ratio: -0.33333
+        invert_effort: true
+      C:
+        motor_type: wheel_motor_r
+        motor_name: wheel_motor_r
+        motor_mimic_name: wheel_r
+        motor_mimic_gear_ratio: -0.33333
+        invert_effort: true
+        # motor_mimic_gear_ratio > 0 -> mimic gear turns the same direction as the motor
+        # motor_mimic_gear_ratio < 0 -> mimic gear turns in the opposite direction as the motor
 
 # Define node specific/local parameters (has to match with name above)
 /ultrasonic_sensor:

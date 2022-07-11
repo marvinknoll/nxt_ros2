@@ -372,6 +372,7 @@ class NxtRos2Setup(rclpy.node.Node):
 
     def __init__(self, brick: nxt.brick.Brick):
         self._brick = brick
+        self._devices_prefix = "devices"
 
         super().__init__("nxt_ros_setup", allow_undeclared_parameters=True,
                          automatically_declare_parameters_from_overrides=True)
@@ -389,7 +390,7 @@ class NxtRos2Setup(rclpy.node.Node):
 
         for port_str in valid_sensor_ports:
             sensor_params: Dict[str, rclpy.Parameter] = self.get_parameters_by_prefix(
-                port_str)
+                self._devices_prefix + "." + port_str)
 
             if sensor_params == {}:
                 # No sensor defined for this port
@@ -486,7 +487,7 @@ class NxtRos2Setup(rclpy.node.Node):
 
         for port_str in valid_motor_ports:
             motor_params: Dict[str, rclpy.Parameter] = self.get_parameters_by_prefix(
-                port_str)
+                self._devices_prefix + "." + port_str)
 
             if motor_params == {}:
                 # No motor defined for this port
@@ -599,10 +600,9 @@ class NxtRos2Setup(rclpy.node.Node):
         valid_motor_ports: List[str] = ["A", "B", "C"]
         valid_sensor_ports: List[str] = ["1", "2", "3", "4"]
 
-        params = self.get_parameters_by_prefix("")
-        params = list(map(lambda param: param.split(".")[0], params))
-        ports = list(
-            set(filter(lambda port: port != 'use_sim_time', params)))
+        params = self.get_parameters_by_prefix(
+            self._devices_prefix)
+        ports = list(map(lambda param: param.split(".")[0], params))
 
         for port in ports:
             if port not in valid_motor_ports and port not in valid_sensor_ports:
