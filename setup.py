@@ -32,7 +32,8 @@ setup(
         'console_scripts': [
             'nxt_ros = nxt_ros2.nxt_ros:main',
             'js_aggregator = nxt_ros2.joint_state_aggregator:main',
-            'diff_drive_controller = nxt_ros2.diff_drive_controller:main'
+            'diff_drive_controller = nxt_ros2.diff_drive_controller:main',
+            'nxt_teleop = nxt_ros2.nxt_teleop:main'
         ],
     },
 )
