@@ -30,6 +30,11 @@
         invert_effort: true
         # motor_mimic_gear_ratio > 0 -> mimic gear turns the same direction as the motor
         # motor_mimic_gear_ratio < 0 -> mimic gear turns in the opposite direction as the motor
+    robot_dimensions: # Optional parameters. Only required if you have a two wheel differentially driven robot and want the controller and odometry to work.
+      # If you have a URDF file describing the robot, the values must match for the visualization to work properly
+      axle_track: 0.135 # meters
+      wheel_radius: 0.022 # meters
+      rad_per_s_to_effort: 5.86 # multiplier
 
 # Define node specific/local parameters (has to match with name above)
 /ultrasonic_sensor:
@@ -49,10 +54,3 @@
 /joint_state_aggregator:
   ros__parameters:
     related_js_time_delta: 1000000000 # nanoseconds
-
-/diff_drive_controller:
-  ros__parameters:
-    # If you have a URDF file describing the robot, the values must match for the visualization to work properly
-    axle_track: 0.135 # meters
-    wheel_radius: 0.022 # meters
-    rad_per_s_to_effort: 5.86 # multiplier

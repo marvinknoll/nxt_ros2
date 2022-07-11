@@ -50,6 +50,13 @@ class MotorConfigs:
         self.invert_efforts: List[bool] = []
 
 
+class RobotDimensions:
+    def __init__(self, axle_track: float = -1.0, wheel_radius: float = -1.0, rad_per_s_to_effort: float = -1.0):
+        self.axle_track = axle_track
+        self.wheel_radius = wheel_radius
+        self.rad_per_s_to_effort = rad_per_s_to_effort
+
+
 class TouchSensor(rclpy.node.Node):
     def __init__(self, brick: nxt.brick.Brick, name: str, port: nxt.sensor.Port):
         super().__init__(name)
@@ -372,14 +379,20 @@ class NxtRos2Setup(rclpy.node.Node):
 
     def __init__(self, brick: nxt.brick.Brick):
         self._brick = brick
+
         self._devices_prefix = "devices"
+        self._robot_dimensions_prefix = "robot_dimensions"
 
         super().__init__("nxt_ros_setup", allow_undeclared_parameters=True,
                          automatically_declare_parameters_from_overrides=True)
 
-        service_name = self.get_name() + '/get_available_motor_configs'
-        self._motor_names_service = self.create_service(
-            nxt_msgs2.srv.MotorConfigs, service_name, self.get_available_motor_configs)
+        motor_config_service_name = self.get_name() + '/get_available_motor_configs'
+        self._motor_configs_service = self.create_service(
+            nxt_msgs2.srv.MotorConfigs, motor_config_service_name, self.get_available_motor_configs)
+
+        robot_dimensions_service_name = self.get_name() + '/get_robot_dimensions'
+        self._robot_dimensions_service = self.create_service(
+            nxt_msgs2.srv.RobotDimensions, robot_dimensions_service_name, self.get_robot_diemensions)
 
     # Sensors
     def get_sensor_configs_from_parameters(self) -> SensorConfigs:
@@ -594,6 +607,35 @@ class NxtRos2Setup(rclpy.node.Node):
             return nxt.motor.Port.C
         else:
             raise Exception("Invalid motor port in config parameters")
+
+    # Robot dimensions
+    def get_robot_dimensions_from_config_parameters(self) -> RobotDimensions:
+        required_robot_dimension_params = {
+            "axle_track", "wheel_radius", "rad_per_s_to_effort"}
+        params: Dict[str, rclpy.Parameter] = self.get_parameters_by_prefix(
+            self._robot_dimensions_prefix)
+
+        if not params.keys() >= required_robot_dimension_params:
+            self.get_logger().warn("Missing or invalid robot dimensions config parameters, required %s" %
+                                   required_robot_dimension_params)
+            return RobotDimensions()
+
+        robot_dimensions = RobotDimensions()
+        robot_dimensions.axle_track = self.get_parameter(
+            self._robot_dimensions_prefix + "." + "axle_track").value
+        robot_dimensions.wheel_radius = self.get_parameter(
+            self._robot_dimensions_prefix + "." + "wheel_radius").value
+        robot_dimensions.rad_per_s_to_effort = self.get_parameter(
+            self._robot_dimensions_prefix + "." + "rad_per_s_to_effort").value
+        return robot_dimensions
+
+    def get_robot_diemensions(self, request, response):
+        robot_dimensions = self.get_robot_dimensions_from_config_parameters()
+        response.header.stamp = self.get_clock().now().to_msg()
+        response.axle_track = robot_dimensions.axle_track
+        response.wheel_radius = robot_dimensions.wheel_radius
+        response.rad_per_s_to_effort = robot_dimensions.rad_per_s_to_effort
+        return response
 
     # General
     def check_ports_config_parameters(self) -> bool:
