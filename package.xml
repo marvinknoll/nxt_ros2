@@ -8,7 +8,8 @@
   <license>TODO: License declaration</license>
 
   <depend>python3-nxt-python-pip</depend>
-  <depend>nxt_msgs</depend>
+  <depend>nxt_msgs2</depend>
+
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>
