@@ -37,7 +37,7 @@ CONTROL_BINDINGS = {
 }
 
 CONTROL_VEL_BINDINGS = {
-    'u': 0.1,
+    'u': 0.9,
     'o': 1.1
 }
 
@@ -51,7 +51,7 @@ Moving around:  | Turning the third motor
   
 k/i : decrease/increase linear velocity by the factor of 0.5 / 1.5
 j/l : decrease/increase angular velocity by the factor of 0.5 / 1.5
-u/o : decrease/increase third motor velocity by the factor of 0.1 / 1.1
+u/o : decrease/increase third motor velocity by the factor of 0.9 / 1.1
 
 Not pressing any keys stops all motors.
 Pressing multiple keys is not possible.
