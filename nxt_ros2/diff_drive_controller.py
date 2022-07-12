@@ -96,8 +96,6 @@ class DiffDriveController(rclpy.node.Node):
         motor_l_name = self._motor_configs.motor_names[motor_l_index]
         motor_r_gear_ratio = self._motor_configs.motor_mimic_gear_ratios[motor_r_index]
         motor_l_gear_ratio = self._motor_configs.motor_mimic_gear_ratios[motor_l_index]
-        invert_direction_r = self._motor_configs.invert_directions[motor_r_index]
-        invert_direction_l = self._motor_configs.invert_directions[motor_l_index]
 
         if motor_r_name not in msg.name or motor_l_name not in msg.name:
             self.get_logger().warning(
@@ -111,9 +109,6 @@ class DiffDriveController(rclpy.node.Node):
 
         motor_r_vel = wheel_r_vel / motor_r_gear_ratio  # rad/s
         motor_l_vel = wheel_l_vel / motor_l_gear_ratio  # rad/s
-
-        motor_r_vel = motor_r_vel * -1 if invert_direction_r else motor_r_vel
-        motor_l_vel = motor_l_vel * -1 if invert_direction_l else motor_l_vel
 
         joint_effort_r = nxt_msgs2.msg.JointEffort()
         joint_effort_r.header.stamp = self.get_clock().now().to_msg()

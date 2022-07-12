@@ -236,10 +236,11 @@ class ReflectedLightSensor(rclpy.node.Node):
 
 
 class Motor(rclpy.node.Node):
-    def __init__(self, brick: nxt.brick.Brick, name: str, port: nxt.motor.Port):
+    def __init__(self, brick: nxt.brick.Brick, name: str, port: nxt.motor.Port, invert_direction: bool):
         super().__init__(name)
 
         self._port = port
+        self._invert_direction = invert_direction
         self._motor = brick.get_motor(port)
         self._last_js = None
         self._effort = 0
@@ -276,9 +277,10 @@ class Motor(rclpy.node.Node):
 
     def motor_cb(self):
         now = self.get_clock().now()
-        position_rad = self.get_motor_position()
+        invert_direction = -1 if self._invert_direction else 1
+        position_rad = self.get_motor_position() * invert_direction
         joint_name = self.get_name()
-        joint_effort = self._effort * self._POWER_TO_NM
+        joint_effort = self._effort * self._POWER_TO_NM * invert_direction
         velocity = 0
 
         if self._last_js:
@@ -303,7 +305,7 @@ class Motor(rclpy.node.Node):
         self._last_js = js
 
         if not self._turning_lock.locked():
-            self._motor.run(int(self._effort), True)
+            self._motor.run(int(self._effort * invert_direction), True)
         elif self._goal_handle is not None and self._goal_handle.is_active:
             feedback_msg = nxt_msgs2.action.TurnMotor.Feedback()
             feedback_msg.header.stamp = self.get_clock().now().to_msg()
@@ -490,11 +492,10 @@ class NxtRos2Setup(rclpy.node.Node):
             raise Exception("Invalid sensor port in config parameters")
 
     # Motors
-
     def get_motor_configs_from_parameters(self) -> MotorConfigs:
         valid_motor_ports = ["A", "B", "C"]
         required_motor_params = {'motor_name', 'motor_type',
-                                 'motor_mimic_name', 'motor_mimic_gear_ratio'}
+                                 'motor_mimic_name', 'motor_mimic_gear_ratio', 'invert_direction'}
 
         motor_configs = MotorConfigs()
 
@@ -520,16 +521,8 @@ class NxtRos2Setup(rclpy.node.Node):
                 motor_params['motor_mimic_name'].value)
             motor_configs.motor_mimic_gear_ratios.append(
                 motor_params['motor_mimic_gear_ratio'].value)
-
-            if motor_type == MotorType.wheel_motor_r.value or motor_type == MotorType.wheel_motor_l.value:
-                if "invert_direction" not in motor_params.keys() or not isinstance(motor_params['invert_direction'].value, bool):
-                    raise Exception(
-                        "Missing or invalid motor config parameter 'invert_direction: bool' for motor: '%s'" % port_str)
-                else:
-                    motor_configs.invert_directions.append(
-                        motor_params['invert_direction'].value)
-            else:
-                motor_configs.invert_directions.append(False)
+            motor_configs.invert_directions.append(
+                motor_params['invert_direction'].value)
 
         return motor_configs
 
@@ -573,8 +566,10 @@ class NxtRos2Setup(rclpy.node.Node):
             motor_port_enum = self.string_to_motor_port_enum(
                 motor_port_str)
             motor_type = motor_configs.motor_types[i]
+            invert_direction = motor_configs.invert_directions[i]
 
-            motor_nodes.append(Motor(brick, motor_name, motor_port_enum))
+            motor_nodes.append(
+                Motor(brick, motor_name, motor_port_enum, invert_direction))
 
             self.get_logger().info("Created motor of type '%s' with node name '%s' on port '%s'" %
                                    (motor_type, motor_name, motor_port_enum))
