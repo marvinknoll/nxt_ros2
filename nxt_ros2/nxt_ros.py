@@ -616,7 +616,7 @@ class NxtRos2Setup(rclpy.node.Node):
             self._robot_dimensions_prefix)
 
         if not params.keys() >= required_robot_dimension_params:
-            self.get_logger().warn("Missing or invalid robot dimensions config parameters, required %s" %
+            self.get_logger().info("Missing/Invalid 'robot_dimensions' config params, %s required for differential drive controller & odometry to work." %
                                    required_robot_dimension_params)
             return RobotDimensions()
 

@@ -23,7 +23,7 @@ class DiffDriveController(rclpy.node.Node):
 
         if "wheel_motor_r" not in self._motor_configs.motor_types or "wheel_motor_l" not in self._motor_configs.motor_types:
             self.get_logger().info(
-                "No differential drive controller is required since no wheel motors are defined.")
+                "No wheel motors are defined. Stopping differential drive controller node")
             return
 
         # Robot dimensions
@@ -35,7 +35,8 @@ class DiffDriveController(rclpy.node.Node):
         self._robot_dimensions: RobotDimensions = self.get_robot_dimensions()
 
         if self._robot_dimensions.axle_track == -1.0 or self._robot_dimensions.rad_per_s_to_effort == -1.0 or self._robot_dimensions.wheel_radius == -1.0:
-            self.get_logger().info("Got no valid robot dimensions configurations from nxt_ros_setup node. Stopping differential drive controller")
+            self.get_logger().info(
+                "No valid robot dimensions config params. Stopping differential drive controller node")
             return
 
         # Controller
@@ -63,7 +64,8 @@ class DiffDriveController(rclpy.node.Node):
         motor_configs.motor_types = result.motor_types
         motor_configs.invert_efforts = result.invert_efforts
 
-        self.get_logger().info("Got available motors configurations from nxt_ros_setup node")
+        if "wheel_motor_r" in motor_configs.motor_types and "wheel_motor_l" in motor_configs.motor_types:
+            self.get_logger().info("Got available motors configurations from nxt_ros_setup node")
 
         return motor_configs
 
