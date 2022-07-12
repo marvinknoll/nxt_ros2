@@ -47,7 +47,7 @@ class MotorConfigs:
         self.motor_types: List[str] = []
         self.motor_mimic_names: List[str] = []
         self.motor_mimic_gear_ratios: List[int] = []
-        self.invert_efforts: List[bool] = []
+        self.invert_directions: List[bool] = []
 
 
 class RobotDimensions:
@@ -522,14 +522,14 @@ class NxtRos2Setup(rclpy.node.Node):
                 motor_params['motor_mimic_gear_ratio'].value)
 
             if motor_type == MotorType.wheel_motor_r.value or motor_type == MotorType.wheel_motor_l.value:
-                if "invert_effort" not in motor_params.keys() or not isinstance(motor_params['invert_effort'].value, bool):
+                if "invert_direction" not in motor_params.keys() or not isinstance(motor_params['invert_direction'].value, bool):
                     raise Exception(
-                        "Missing or invalid motor config parameter 'invert_effort: bool' for motor: '%s'" % port_str)
+                        "Missing or invalid motor config parameter 'invert_direction: bool' for motor: '%s'" % port_str)
                 else:
-                    motor_configs.invert_efforts.append(
-                        motor_params['invert_effort'].value)
+                    motor_configs.invert_directions.append(
+                        motor_params['invert_direction'].value)
             else:
-                motor_configs.invert_efforts.append(False)
+                motor_configs.invert_directions.append(False)
 
         return motor_configs
 
@@ -595,7 +595,7 @@ class NxtRos2Setup(rclpy.node.Node):
         response.motor_mimic_gear_ratios = motor_configs.motor_mimic_gear_ratios
         response.motor_ports = motor_configs.motor_ports
         response.motor_types = motor_configs.motor_types
-        response.invert_efforts = motor_configs.invert_efforts
+        response.invert_directions = motor_configs.invert_directions
         return response
 
     def string_to_motor_port_enum(self, port: str) -> nxt.motor.Port:
