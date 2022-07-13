@@ -11,6 +11,7 @@
       4:
         sensor_type: ultrasonic
         sensor_name: ultrasonic_sensor
+        frame_id: radar_link # optional: adds frame_id to message.header
       A:
         motor_type: other
         motor_name: radar_motor

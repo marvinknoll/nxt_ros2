@@ -38,6 +38,7 @@ class SensorConfigs:
         self.sensor_names: List[str] = []
         self.sensor_types: List[str] = []
         self.sensor_ports: List[str] = []
+        self.sensor_frame_ids: List[str, None] = []
 
 
 class MotorConfigs:
@@ -58,8 +59,10 @@ class RobotDimensions:
 
 
 class TouchSensor(rclpy.node.Node):
-    def __init__(self, brick: nxt.brick.Brick, name: str, port: nxt.sensor.Port):
+    def __init__(self, brick: nxt.brick.Brick, name: str, port: nxt.sensor.Port, frame_id: Union[str, None] = None):
         super().__init__(name)
+
+        self._frame_id = frame_id
 
         self._sensor = brick.get_sensor(port, nxt.sensor.generic.Touch)
 
@@ -72,6 +75,8 @@ class TouchSensor(rclpy.node.Node):
     def measure(self):
         msg = nxt_msgs2.msg.Touch()
         msg.header.stamp = self.get_clock().now().to_msg()
+        if self._frame_id is not None:
+            msg.header.frame_id = self._frame_id
         msg.touch = self._sensor.get_sample()
         self._publisher.publish(msg)
 
@@ -80,8 +85,10 @@ class TouchSensor(rclpy.node.Node):
 
 
 class UltraSonicSensor(rclpy.node.Node):
-    def __init__(self, brick: nxt.brick.Brick, name: str, port: nxt.sensor.Port):
+    def __init__(self, brick: nxt.brick.Brick, name: str, port: nxt.sensor.Port, frame_id: Union[str, None] = None):
         super().__init__(name)
+
+        self._frame_id = frame_id
 
         # Default values for LEGO Mindstorms NXT ultrasonic sensor
         self.declare_parameters(namespace="", parameters=[
@@ -107,6 +114,8 @@ class UltraSonicSensor(rclpy.node.Node):
 
         msg = sensor_msgs.msg.Range()
         msg.header.stamp = self.get_clock().now().to_msg()
+        if self._frame_id is not None:
+            msg.header.frame_id = self._frame_id
         msg.radiation_type = 0  # ultrasound
         msg.field_of_view = field_of_view
         msg.min_range = min_range
@@ -120,8 +129,10 @@ class UltraSonicSensor(rclpy.node.Node):
 
 
 class ColorSensor(rclpy.node.Node):
-    def __init__(self, brick: nxt.brick.Brick, name: str, port: nxt.sensor.Port):
+    def __init__(self, brick: nxt.brick.Brick, name: str, port: nxt.sensor.Port, frame_id: Union[str, None] = None):
         super().__init__(name)
+
+        self._frame_id = frame_id
 
         self._sensor = brick.get_sensor(port, nxt.sensor.generic.Color)
 
@@ -134,6 +145,8 @@ class ColorSensor(rclpy.node.Node):
     def measure(self):
         msg = nxt_msgs2.msg.Color()
         msg.header.stamp = self.get_clock().now().to_msg()
+        if self._frame_id is not None:
+            msg.header.frame_id = self._frame_id
         sample = self._sensor.get_color()
         msg.color = self.color_code_to_rgba(sample)
 
@@ -175,8 +188,10 @@ class ColorSensor(rclpy.node.Node):
 
 
 class ReflectedLightSensor(rclpy.node.Node):
-    def __init__(self, brick: nxt.brick.Brick, name: str, port: nxt.sensor.Port):
+    def __init__(self, brick: nxt.brick.Brick, name: str, port: nxt.sensor.Port, frame_id: Union[str, None] = None):
         super().__init__(name)
+
+        self._frame_id = frame_id
 
         self._sensor = brick.get_sensor(port, nxt.sensor.generic.Color)
 
@@ -205,15 +220,17 @@ class ReflectedLightSensor(rclpy.node.Node):
             'rgb_color').get_parameter_value().double_array_value
         color = self.rgb_to_color_type(rgb)
 
-        reflected_light = nxt_msgs2.msg.Color()
-        reflected_light.header.stamp = self.get_clock().now().to_msg()
-        reflected_light.color.a = float(
+        msg = nxt_msgs2.msg.Color()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        if self._frame_id is not None:
+            msg.header.frame_id = self._frame_id
+        msg.color.a = float(
             self._sensor.get_reflected_light(color))
-        reflected_light.color.r = rgb[0]
-        reflected_light.color.g = rgb[1]
-        reflected_light.color.b = rgb[2]
+        msg.color.r = rgb[0]
+        msg.color.g = rgb[1]
+        msg.color.b = rgb[2]
 
-        self._publisher.publish(reflected_light)
+        self._publisher.publish(msg)
 
     def rgb_to_color_type(self, rgb: List[float]):
         """Converts List [r: float, g: float, b: float] to nxt_python's color code."""
@@ -421,6 +438,12 @@ class NxtRos2Setup(rclpy.node.Node):
             sensor_configs.sensor_names.append(
                 sensor_params['sensor_name'].value)
 
+            if "frame_id" in sensor_params:  # optional parameter
+                sensor_configs.sensor_frame_ids.append(
+                    sensor_params['frame_id'].value)
+            else:
+                sensor_configs.sensor_frame_ids.append(None)
+
         return sensor_configs
 
     def check_sensor_configs(self, sensor_configs: SensorConfigs):
@@ -442,7 +465,6 @@ class NxtRos2Setup(rclpy.node.Node):
                 raise Exception(
                     "Invalid sensor_type '%s' config for sensor on port: '%s'. Valid sensor_type's: %s" % (sensor_type, sensor_port, valid_sensor_types))
 
-    # TODO Refactor sensors to extend a Sensor class
     def create_sensor_nodes(self, brick: nxt.brick.Brick, sensor_configs: SensorConfigs) -> List[Union[TouchSensor, UltraSonicSensor,
                                                                                                        ColorSensor, ReflectedLightSensor]]:
         sensor_nodes: List[Union[TouchSensor, UltraSonicSensor,
@@ -453,19 +475,20 @@ class NxtRos2Setup(rclpy.node.Node):
             sensor_port_str = sensor_configs.sensor_ports[i]
             sensor_port_enum = self.str_to_sensor_port_enum(sensor_port_str)
             sensor_type = sensor_configs.sensor_types[i]
+            sensor_frame_id = sensor_configs.sensor_frame_ids[i]
 
             if sensor_type == "touch":
                 sensor_nodes.append(TouchSensor(
-                    brick, sensor_name, sensor_port_enum))
+                    brick, sensor_name, sensor_port_enum, sensor_frame_id))
             elif sensor_type == "ultrasonic":
                 sensor_nodes.append(UltraSonicSensor(
-                    brick, sensor_name, sensor_port_enum))
+                    brick, sensor_name, sensor_port_enum, sensor_frame_id))
             elif sensor_type == "color":
                 sensor_nodes.append(ColorSensor(
-                    brick, sensor_name, sensor_port_enum))
+                    brick, sensor_name, sensor_port_enum, sensor_frame_id))
             elif sensor_type == "reflected_light":
                 sensor_nodes.append(ReflectedLightSensor(
-                    brick, sensor_name, sensor_port_enum))
+                    brick, sensor_name, sensor_port_enum, sensor_frame_id))
 
             self.get_logger().info("Created sensor of type '%s' with node name '%s' on port '%s'" %
                                    (sensor_type, sensor_name, sensor_port_enum))
