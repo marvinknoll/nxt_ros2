@@ -10,6 +10,8 @@
   <depend>python3-nxt-python-pip</depend>
   <depend>nxt_msgs2</depend>
 
+  <exec_depend>rviz2</exec_depend>
+  <exec_depend>xacro</exec_depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>

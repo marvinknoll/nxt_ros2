@@ -1,0 +1,52 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+  - Class: rviz_common/Views
+    Name: Views
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Class: rviz_default_plugins/Grid
+      Name: Grid
+      Value: true
+    - Alpha: 0.8
+      Class: rviz_default_plugins/RobotModel
+      Description Source: Topic
+      Description Topic:
+        Value: /robot_description
+      Enabled: true
+      Name: RobotModel
+      Value: true
+    - Class: rviz_default_plugins/TF
+      Name: TF
+      Value: true
+      Marker Scale: 0.2
+    - Class: rviz_default_plugins/Range
+      Buffer Length: 1
+      Color: 255; 255; 255
+      Enabled: true
+      Name: Range
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Best Effort
+        Value: /ultrasonic_sensor
+      Value: true
+  Global Options:
+    Fixed Frame: odom
+    Frame Rate: 30
+  Name: root
+  Tools:
+    - Class: rviz_default_plugins/MoveCamera
+  Value: true
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Distance: 0.5
+      Name: Current View
+      Pitch: 0.33
+      Value: Orbit (rviz)
+Window Geometry:
+  Height: 1800
+  Width: 2500
