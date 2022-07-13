@@ -181,7 +181,7 @@ def main(args=None):
     # velocities / effort
     lin_vel = 0.065  # m/s
     ang_vel = 0.85  # rad/s
-    third_motor_effort = 50  # nxt.motor.run effort
+    third_motor_effort = 30  # nxt.motor.run effort
 
     teleop = Teleop()
 
