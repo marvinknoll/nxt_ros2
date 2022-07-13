@@ -29,6 +29,8 @@ def generate_launch_description():
                                        executable='js_aggregator',
                                        parameters=[LaunchConfiguration('device_config_file')])
 
+    odometry_node = Node(package='nxt_ros2', executable='odometry')
+
     differential_drive_controller_node = Node(package='nxt_ros2',
                                               executable='diff_drive_controller',
                                               parameters=[LaunchConfiguration('device_config_file')])
@@ -37,5 +39,6 @@ def generate_launch_description():
         devices_config_file,
         nxt_node,
         joint_state_aggregator_node,
+        odometry_node,
         differential_drive_controller_node
     ])
