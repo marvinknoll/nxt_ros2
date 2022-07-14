@@ -1,5 +1,6 @@
 import rclpy
 import rclpy.node
+import rclpy.executors
 
 import geometry_msgs.msg
 import sensor_msgs.msg
@@ -127,14 +128,14 @@ class DiffDriveController(rclpy.node.Node):
 def main(args=None):
     try:
         rclpy.init(args=args)
-
         controller = DiffDriveController()
-
         rclpy.spin(controller)
 
+    except (KeyboardInterrupt, rclpy.executors.ExternalShutdownException):
+        print('Got clean shutdown signal, shutting down node.')
+
     finally:
-        controller.destroy_node()
-        rclpy.shutdown()
+        rclpy.try_shutdown()
 
 
 if __name__ == '__main__':

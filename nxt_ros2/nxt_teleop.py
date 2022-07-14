@@ -1,6 +1,7 @@
 from typing import List, Union
 import rclpy
 import rclpy.node
+import rclpy.executors
 
 import geometry_msgs.msg
 import nxt_msgs2.msg
@@ -218,6 +219,10 @@ def main(args=None):
 
             teleop._cb_publish_twist_and_joint_effort(lin, ang, third_motor, lin_vel,
                                                       ang_vel, third_motor_effort)
+
+    except (KeyboardInterrupt, rclpy.executors.ExternalShutdownException):
+        print('Got clean shutdown signal, shutting down node.')
+        pass
 
     except:
         print(error_msg)

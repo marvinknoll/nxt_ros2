@@ -22,7 +22,7 @@ class JointState:
 
 
 class JointStateAggregator(rclpy.node.Node):
-    """Subscribes to joint_state topic, and once it observes a js from all joints, it aggregates them into a 
+    """Subscribes to joint_state topic, and once it observes a js from all joints, it aggregates them into a
     single JointState message and publishes it to /joint_states. Additionally, it calculates and adds
     one joint_state 'mimic' per motor, using motor configs from /nxt_ros_setup setup node."""
 
@@ -120,14 +120,14 @@ class JointStateAggregator(rclpy.node.Node):
 def main(args=None):
     try:
         rclpy.init(args=args)
-
         js_agg = JointStateAggregator()
-
         rclpy.spin(js_agg)
 
+    except (KeyboardInterrupt, rclpy.executors.ExternalShutdownException):
+        print('Got clean shutdown signal, shutting down node.')
+
     finally:
-        js_agg.destroy_node()
-        rclpy.shutdown()
+        rclpy.try_shutdown()
 
 
 if __name__ == '__main__':

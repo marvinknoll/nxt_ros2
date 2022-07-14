@@ -1,5 +1,6 @@
 import rclpy
 import rclpy.node
+import rclpy.executors
 
 from nxt_ros2.util.helper_classes import MotorConfigs, RobotDimensions
 
@@ -197,11 +198,13 @@ class Odometry(rclpy.node.Node):
 
 
 def main(args=None):
-    rclpy.init(args=args)
-
     try:
+        rclpy.init(args=args)
         odometry = Odometry()
         rclpy.spin(odometry)
+
+    except (KeyboardInterrupt, rclpy.executors.ExternalShutdownException):
+        print('Got clean shutdown signal, shutting down node.')
 
     finally:
         rclpy.shutdown()

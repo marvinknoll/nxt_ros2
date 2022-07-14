@@ -2,7 +2,7 @@ import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.substitutions import LaunchConfiguration, Command
-from launch.actions import DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, Shutdown
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 from launch.conditions import IfCondition
@@ -44,17 +44,23 @@ def generate_launch_description():
 
     nxt_node = Node(package='nxt_ros2',
                     executable='nxt_ros',
-                    parameters=[LaunchConfiguration('device_config_file')]
+                    output='screen',
+                    parameters=[LaunchConfiguration('device_config_file')],
+                    on_exit=Shutdown()
                     )
 
     joint_state_aggregator_node = Node(package='nxt_ros2',
                                        executable='js_aggregator',
+                                       output='screen',
                                        parameters=[LaunchConfiguration('device_config_file')])
 
-    odometry_node = Node(package='nxt_ros2', executable='odometry')
+    odometry_node = Node(package='nxt_ros2',
+                         output='screen',
+                         executable='odometry')
 
     differential_drive_controller_node = Node(package='nxt_ros2',
                                               executable='diff_drive_controller',
+                                              output="screen",
                                               parameters=[LaunchConfiguration('device_config_file')])
 
     robot_description = ParameterValue(Command(['xacro ', LaunchConfiguration('model')]),
@@ -70,7 +76,6 @@ def generate_launch_description():
         package='rviz2',
         executable='rviz2',
         name='rviz2',
-        output='screen',
         arguments=['-d', LaunchConfiguration('rviz_config')],
         condition=IfCondition(LaunchConfiguration('visualize'))
     )
