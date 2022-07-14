@@ -111,16 +111,17 @@ class Teleop(rclpy.node.Node):
             nxt_msgs2.msg.JointEffort, "joint_effort", 10)
 
         self._get_motors_configs_client = self.create_client(
-            nxt_msgs2.srv.MotorConfigs, "/nxt_ros_setup/get_available_motor_configs")
+            nxt_msgs2.srv.MotorConfigs, "/nxt_ros_setup/get_motor_configs")
         while not self._get_motors_configs_client.wait_for_service(timeout_sec=1.0):
             self.get_logger().info(
-                "nxt_ros_setup/get_available_motor_configs service not available, waiting again...")
-        self._third_motor_name: str = self.get_third_motor_name()
+                "nxt_ros_setup/get_motor_configs service not available, waiting again...")
+        self._third_motor_name: str = self._get_third_motor_name()
 
         timer_period = 0.2
-        self.create_timer(timer_period, self.publish)
+        self.create_timer(
+            timer_period, self._cb_publish_twist_and_joint_effort)
 
-    def get_third_motor_name(self) -> Union[str, None]:
+    def _get_third_motor_name(self) -> Union[str, None]:
         self._req = nxt_msgs2.srv.MotorConfigs.Request()
         future = self._get_motors_configs_client.call_async(self._req)
         rclpy.spin_until_future_complete(self, future)
@@ -136,7 +137,7 @@ class Teleop(rclpy.node.Node):
 
         return third_motor_name
 
-    def publish(self, lin, ang, third_motor, lin_vel, ang_vel, third_motor_effort):
+    def _cb_publish_twist_and_joint_effort(self, lin, ang, third_motor, lin_vel, ang_vel, third_motor_effort):
         # TwistStamped
         twist = geometry_msgs.msg.TwistStamped()
         twist.header.stamp = self.get_clock().now().to_msg()
@@ -215,8 +216,8 @@ def main(args=None):
                 ang = 0
                 third_motor = 0
 
-            teleop.publish(lin, ang, third_motor, lin_vel,
-                           ang_vel, third_motor_effort)
+            teleop._cb_publish_twist_and_joint_effort(lin, ang, third_motor, lin_vel,
+                                                      ang_vel, third_motor_effort)
 
     except:
         print(error_msg)

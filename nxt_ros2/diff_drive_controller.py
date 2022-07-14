@@ -15,11 +15,11 @@ class DiffDriveController(rclpy.node.Node):
 
         # Motor configs
         self._get_motors_configs_client = self.create_client(
-            nxt_msgs2.srv.MotorConfigs, "/nxt_ros_setup/get_available_motor_configs")
+            nxt_msgs2.srv.MotorConfigs, "/nxt_ros_setup/get_motor_configs")
         while not self._get_motors_configs_client.wait_for_service(timeout_sec=1.0):
             self.get_logger().info(
-                "nxt_ros_setup/get_available_motor_configs service not available, waiting again...")
-        self._motor_configs: MotorConfigs = self.get_motor_configs()
+                "nxt_ros_setup/get_motor_configs service not available, waiting again...")
+        self._motor_configs: MotorConfigs = self._get_motor_configs()
 
         if "wheel_motor_r" not in self._motor_configs.motor_types or "wheel_motor_l" not in self._motor_configs.motor_types:
             self.get_logger().info(
@@ -32,7 +32,7 @@ class DiffDriveController(rclpy.node.Node):
         while not self._get_robot_dimensions_client.wait_for_service(timeout_sec=1.0):
             self.get_logger().info(
                 "nxt_ros_setup/get_robot_dimensions service not available, waiting again...")
-        self._robot_dimensions: RobotDimensions = self.get_robot_dimensions()
+        self._robot_dimensions: RobotDimensions = self._get_robot_dimensions()
 
         if self._robot_dimensions.axle_track == -1.0 or self._robot_dimensions.rad_per_s_to_effort == -1.0 or self._robot_dimensions.wheel_radius == -1.0:
             self.get_logger().info(
@@ -44,15 +44,15 @@ class DiffDriveController(rclpy.node.Node):
         self._goal_ang_vel = 0
 
         self._cmd_vel_subscriber = self.create_subscription(
-            geometry_msgs.msg.TwistStamped, "cmd_vel", self.cmd_vel_cb, 10)
+            geometry_msgs.msg.TwistStamped, "cmd_vel", self._cb_set_goal_vels, 10)
 
         self._joint_states_subscriber = self.create_subscription(
-            sensor_msgs.msg.JointState, "joint_states", self.joint_states_cb, 10)
+            sensor_msgs.msg.JointState, "joint_states", self._cb_calc_and_pub_joint_efforts, 10)
 
         self._joint_effort_publisher = self.create_publisher(
             nxt_msgs2.msg.JointEffort, "joint_effort", 10)
 
-    def get_motor_configs(self) -> MotorConfigs:
+    def _get_motor_configs(self) -> MotorConfigs:
         self._req = nxt_msgs2.srv.MotorConfigs.Request()
         future = self._get_motors_configs_client.call_async(self._req)
         rclpy.spin_until_future_complete(self, future)
@@ -69,7 +69,7 @@ class DiffDriveController(rclpy.node.Node):
 
         return motor_configs
 
-    def get_robot_dimensions(self) -> RobotDimensions:
+    def _get_robot_dimensions(self) -> RobotDimensions:
         self._req = nxt_msgs2.srv.RobotDimensions.Request()
         future = self._get_robot_dimensions_client.call_async(self._req)
         rclpy.spin_until_future_complete(self, future)
@@ -85,11 +85,11 @@ class DiffDriveController(rclpy.node.Node):
 
         return robot_dimensions
 
-    def cmd_vel_cb(self, msg: geometry_msgs.msg.TwistStamped):
+    def _cb_set_goal_vels(self, msg: geometry_msgs.msg.TwistStamped):
         self._goal_lin_vel = msg.twist.linear.x
         self._goal_ang_vel = msg.twist.angular.z
 
-    def joint_states_cb(self, msg: sensor_msgs.msg.JointState):
+    def _cb_calc_and_pub_joint_efforts(self, msg: sensor_msgs.msg.JointState):
         motor_r_index = self._motor_configs.motor_types.index("wheel_motor_r")
         motor_l_index = self._motor_configs.motor_types.index("wheel_motor_l")
         motor_r_name = self._motor_configs.motor_names[motor_r_index]

@@ -70,9 +70,9 @@ class TouchSensor(rclpy.node.Node):
             nxt_msgs2.msg.Touch, name, 10)
 
         timer_period = 0.3  # seconds
-        self._timer = self.create_timer(timer_period, self.measure)
+        self._timer = self.create_timer(timer_period, self._cb_measure)
 
-    def measure(self):
+    def _cb_measure(self):
         msg = nxt_msgs2.msg.Touch()
         msg.header.stamp = self.get_clock().now().to_msg()
         if self._frame_id is not None:
@@ -102,9 +102,9 @@ class UltraSonicSensor(rclpy.node.Node):
             sensor_msgs.msg.Range, name, 10)
 
         timer_period = 0.3  # seconds
-        self._timer = self.create_timer(timer_period, self.measure)
+        self._timer = self.create_timer(timer_period, self._cb_measure)
 
-    def measure(self):
+    def _cb_measure(self):
         field_of_view = self.get_parameter(
             'field_of_view').get_parameter_value().double_value
         min_range = self.get_parameter(
@@ -140,9 +140,9 @@ class ColorSensor(rclpy.node.Node):
             nxt_msgs2.msg.Color, name, 10)
 
         timer_period = 0.3  # seconds
-        self._timer = self.create_timer(timer_period, self.measure)
+        self._timer = self.create_timer(timer_period, self._cb_measure)
 
-    def measure(self):
+    def _cb_measure(self):
         msg = nxt_msgs2.msg.Color()
         msg.header.stamp = self.get_clock().now().to_msg()
         if self._frame_id is not None:
@@ -199,12 +199,12 @@ class ReflectedLightSensor(rclpy.node.Node):
             nxt_msgs2.msg.Color, name, 10)
 
         self.declare_parameter('rgb_color', [0.0, 0.0, 0.0])
-        self.add_on_set_parameters_callback(self.set_rgb_color_param)
+        self.add_on_set_parameters_callback(self._cb_set_rgb_color_param)
 
         timer_period = 0.3
-        self._timer = self.create_timer(timer_period, self.measure)
+        self._timer = self.create_timer(timer_period, self._cb_measure)
 
-    def set_rgb_color_param(self, params: List[rclpy.Parameter]):
+    def _cb_set_rgb_color_param(self, params: List[rclpy.Parameter]):
         updated_param = False
         for param in params:
             if param.name == "rgb_color" and param.type_ == rclpy.Parameter.Type.DOUBLE_ARRAY:
@@ -215,7 +215,7 @@ class ReflectedLightSensor(rclpy.node.Node):
 
         return rcl_interfaces.msg.SetParametersResult(successful=updated_param)
 
-    def measure(self):
+    def _cb_measure(self):
         rgb = self.get_parameter(
             'rgb_color').get_parameter_value().double_array_value
         color = self.rgb_to_color_type(rgb)
@@ -271,31 +271,31 @@ class Motor(rclpy.node.Node):
         self._motor.reset_position(False)
 
         self._jc_subscriber = self.create_subscription(
-            nxt_msgs2.msg.JointEffort, "joint_effort", self.joint_effort_cb, 10)
+            nxt_msgs2.msg.JointEffort, "joint_effort", self._joint_effort_cb, 10)
 
         self._js_publisher = self.create_publisher(
             sensor_msgs.msg.JointState, "joint_state", 10)
 
         timer_period = 0.1  # seconds
-        self.create_timer(timer_period, self.motor_cb)
+        self.create_timer(timer_period, self._cb_run_motor)
 
         self._action_server = rclpy.action.ActionServer(
             self,
             nxt_msgs2.action.TurnMotor,
             self.get_name() + '_turn',
-            goal_callback=self.goal_callback,
-            handle_accepted_callback=self.handle_accepted_callback,
-            execute_callback=self.execute_callback,
-            cancel_callback=self.cancel_callback)
+            goal_callback=self._cb_srv_goal,
+            handle_accepted_callback=self._cb_srv_handle_accepted,
+            execute_callback=self._cb_srv_turn_motor,
+            cancel_callback=self._cb_srv_cancel)
 
-    def joint_effort_cb(self, msg: nxt_msgs2.msg.JointEffort):
+    def _joint_effort_cb(self, msg: nxt_msgs2.msg.JointEffort):
         if msg.joint_name == self.get_name():
             self._effort = msg.effort
 
-    def motor_cb(self):
+    def _cb_run_motor(self):
         now = self.get_clock().now()
         invert_direction = -1 if self._invert_direction else 1
-        position_rad = self.get_motor_position() * invert_direction
+        position_rad = self._get_motor_position() * invert_direction
         joint_name = self.get_name()
         joint_effort = self._effort * self._POWER_TO_NM * invert_direction
         velocity = 0
@@ -330,13 +330,13 @@ class Motor(rclpy.node.Node):
             feedback_msg.current_position = position_rad
             self._goal_handle.publish_feedback(feedback_msg)
 
-    def get_motor_position(self):
+    def _get_motor_position(self):
         return math.radians(self._motor.get_tacho().rotation_count)
 
-    def goal_callback(self, goal_request):
+    def _cb_srv_goal(self, goal_request):
         return rclpy.action.GoalResponse.ACCEPT
 
-    def handle_accepted_callback(self, goal_handle):
+    def _cb_srv_handle_accepted(self, goal_handle):
         with self._goal_lock:
             if self._goal_handle is not None and self._goal_handle.is_active:
                 self._goal_handle.abort()
@@ -349,10 +349,10 @@ class Motor(rclpy.node.Node):
 
         goal_handle.execute()
 
-    def execute_callback(self, goal_handle):
+    def _cb_srv_turn_motor(self, goal_handle):
         with self._turning_lock:
             req = goal_handle.request
-            self._action_start_rad = self.get_motor_position()
+            self._action_start_rad = self._get_motor_position()
 
             def stop_turn(): return goal_handle.is_cancel_requested and goal_handle.is_active
             motor_turn_thread = threading.Thread(target=self._motor.turn, kwargs={'power': req.power,
@@ -365,7 +365,7 @@ class Motor(rclpy.node.Node):
             motor_turn_thread.start()
             motor_turn_thread.join()
 
-            end_rad = self.get_motor_position()
+            end_rad = self._get_motor_position()
 
             if not goal_handle.is_active:
                 self.get_logger().info("Motor.turn action: goal aborted (motor port: %s)" % self._port)
@@ -384,7 +384,7 @@ class Motor(rclpy.node.Node):
             result.end_position = end_rad
             return result
 
-    def cancel_callback(self, cancel_request):
+    def _cb_srv_cancel(self, cancel_request):
         return rclpy.action.CancelResponse.ACCEPT
 
     def destroy_node(self):
@@ -405,13 +405,13 @@ class NxtRos2Setup(rclpy.node.Node):
         super().__init__("nxt_ros_setup", allow_undeclared_parameters=True,
                          automatically_declare_parameters_from_overrides=True)
 
-        motor_config_service_name = self.get_name() + '/get_available_motor_configs'
+        motor_config_service_name = self.get_name() + '/get_motor_configs'
         self._motor_configs_service = self.create_service(
-            nxt_msgs2.srv.MotorConfigs, motor_config_service_name, self.get_available_motor_configs)
+            nxt_msgs2.srv.MotorConfigs, motor_config_service_name, self._cb_srv_get_motor_configs)
 
         robot_dimensions_service_name = self.get_name() + '/get_robot_dimensions'
         self._robot_dimensions_service = self.create_service(
-            nxt_msgs2.srv.RobotDimensions, robot_dimensions_service_name, self.get_robot_diemensions)
+            nxt_msgs2.srv.RobotDimensions, robot_dimensions_service_name, self._cb_srv_get_robot_dimensions)
 
     # Sensors
     def get_sensor_configs_from_parameters(self) -> SensorConfigs:
@@ -446,7 +446,19 @@ class NxtRos2Setup(rclpy.node.Node):
 
         return sensor_configs
 
-    def check_sensor_configs(self, sensor_configs: SensorConfigs):
+    def str_to_sensor_port_enum(self, port: int) -> nxt.sensor.Port:
+        if port == "1":
+            return nxt.sensor.Port.S1
+        elif port == "2":
+            return nxt.sensor.Port.S2
+        elif port == "3":
+            return nxt.sensor.Port.S3
+        elif port == "4":
+            return nxt.sensor.Port.S4
+        else:
+            raise Exception("Invalid sensor port in config parameters")
+
+    def _check_sensor_configs(self, sensor_configs: SensorConfigs):
         valid_sensor_types = [
             "touch", "ultrasonic", "color", "reflected_light"]
 
@@ -465,8 +477,8 @@ class NxtRos2Setup(rclpy.node.Node):
                 raise Exception(
                     "Invalid sensor_type '%s' config for sensor on port: '%s'. Valid sensor_type's: %s" % (sensor_type, sensor_port, valid_sensor_types))
 
-    def create_sensor_nodes(self, brick: nxt.brick.Brick, sensor_configs: SensorConfigs) -> List[Union[TouchSensor, UltraSonicSensor,
-                                                                                                       ColorSensor, ReflectedLightSensor]]:
+    def _create_sensor_nodes(self, brick: nxt.brick.Brick, sensor_configs: SensorConfigs) -> List[Union[TouchSensor, UltraSonicSensor,
+                                                                                                        ColorSensor, ReflectedLightSensor]]:
         sensor_nodes: List[Union[TouchSensor, UltraSonicSensor,
                                  ColorSensor, ReflectedLightSensor]] = []
 
@@ -498,21 +510,9 @@ class NxtRos2Setup(rclpy.node.Node):
     def create_and_get_sensor_nodes(self) -> List[Union[TouchSensor, UltraSonicSensor,
                                                         ColorSensor, ReflectedLightSensor]]:
         sensor_configs = self.get_sensor_configs_from_parameters()
-        self.check_sensor_configs(sensor_configs)
-        sensor_nodes = self.create_sensor_nodes(self._brick, sensor_configs)
+        self._check_sensor_configs(sensor_configs)
+        sensor_nodes = self._create_sensor_nodes(self._brick, sensor_configs)
         return sensor_nodes
-
-    def str_to_sensor_port_enum(self, port: int) -> nxt.sensor.Port:
-        if port == "1":
-            return nxt.sensor.Port.S1
-        elif port == "2":
-            return nxt.sensor.Port.S2
-        elif port == "3":
-            return nxt.sensor.Port.S3
-        elif port == "4":
-            return nxt.sensor.Port.S4
-        else:
-            raise Exception("Invalid sensor port in config parameters")
 
     # Motors
     def get_motor_configs_from_parameters(self) -> MotorConfigs:
@@ -549,7 +549,17 @@ class NxtRos2Setup(rclpy.node.Node):
 
         return motor_configs
 
-    def check_motor_configs(self, motor_configs: MotorConfigs):
+    def string_to_motor_port_enum(self, port: str) -> nxt.motor.Port:
+        if port == "A":
+            return nxt.motor.Port.A
+        elif port == "B":
+            return nxt.motor.Port.B
+        elif port == "C":
+            return nxt.motor.Port.C
+        else:
+            raise Exception("Invalid motor port in config parameters")
+
+    def _check_motor_configs(self, motor_configs: MotorConfigs):
         valid_motor_types = ['wheel_motor_r', 'wheel_motor_l', 'other']
 
         for i in range(len(motor_configs.motor_names)):
@@ -581,7 +591,7 @@ class NxtRos2Setup(rclpy.node.Node):
             raise Exception(
                 "If you define a motor with motor_type 'wheel_motor_l', please also define one with motor_type: 'wheel_motor_r'. Otherwise config all motor_types as 'other'")
 
-    def create_motor_nodes(self, brick: nxt.brick.Brick, motor_configs: MotorConfigs) -> List[Motor]:
+    def _create_motor_nodes(self, brick: nxt.brick.Brick, motor_configs: MotorConfigs) -> List[Motor]:
         motor_nodes: List[Motor] = []
         for i in range(len(motor_configs.motor_names)):
             motor_name = motor_configs.motor_names[i]
@@ -601,11 +611,11 @@ class NxtRos2Setup(rclpy.node.Node):
 
     def create_and_get_motor_nodes(self) -> List[Motor]:
         motor_configs = self.get_motor_configs_from_parameters()
-        self.check_motor_configs(motor_configs)
-        motor_nodes = self.create_motor_nodes(self._brick, motor_configs)
+        self._check_motor_configs(motor_configs)
+        motor_nodes = self._create_motor_nodes(self._brick, motor_configs)
         return motor_nodes
 
-    def get_available_motor_configs(self, request, response):
+    def _cb_srv_get_motor_configs(self, request, response):
         motor_configs = self.get_motor_configs_from_parameters()
         response.header.stamp = self.get_clock().now().to_msg()
         response.motor_names = motor_configs.motor_names
@@ -615,16 +625,6 @@ class NxtRos2Setup(rclpy.node.Node):
         response.motor_types = motor_configs.motor_types
         response.invert_directions = motor_configs.invert_directions
         return response
-
-    def string_to_motor_port_enum(self, port: str) -> nxt.motor.Port:
-        if port == "A":
-            return nxt.motor.Port.A
-        elif port == "B":
-            return nxt.motor.Port.B
-        elif port == "C":
-            return nxt.motor.Port.C
-        else:
-            raise Exception("Invalid motor port in config parameters")
 
     # Robot dimensions
     def get_robot_dimensions_from_config_parameters(self) -> RobotDimensions:
@@ -647,7 +647,7 @@ class NxtRos2Setup(rclpy.node.Node):
             self._robot_dimensions_prefix + "." + "rad_per_s_to_effort").value
         return robot_dimensions
 
-    def get_robot_diemensions(self, request, response):
+    def _cb_srv_get_robot_dimensions(self, request, response):
         robot_dimensions = self.get_robot_dimensions_from_config_parameters()
         response.header.stamp = self.get_clock().now().to_msg()
         response.axle_track = robot_dimensions.axle_track

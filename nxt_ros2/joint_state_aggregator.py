@@ -30,23 +30,23 @@ class JointStateAggregator(rclpy.node.Node):
         super().__init__("joint_state_aggregator")
 
         self._get_motors_configs_client = self.create_client(
-            nxt_msgs2.srv.MotorConfigs, "/nxt_ros_setup/get_available_motor_configs")
+            nxt_msgs2.srv.MotorConfigs, "/nxt_ros_setup/get_motor_configs")
 
         while not self._get_motors_configs_client.wait_for_service(timeout_sec=1.0):
             self.get_logger().info(
-                "nxt_ros_setup/get_available_motor_configs service not available, waiting again...")
+                "nxt_ros_setup/get_motor_configs service not available, waiting again...")
 
-        self._motor_configs: MotorConfigs = self.get_motor_configs()
+        self._motor_configs: MotorConfigs = self._get_motor_configs()
         self._observed_joint_states: Dict[str, JointState] = {}
 
         self.declare_parameter('related_js_time_delta', 1000000000)
 
         self._joint_state_subscriber = self.create_subscription(sensor_msgs.msg.JointState,
-                                                                'joint_state', self.joint_state_subscriber_cb, 10)
+                                                                'joint_state', self._cb_join_joint_state_to_states, 10)
         self._joint_states_publisher = self.create_publisher(
             sensor_msgs.msg.JointState, 'joint_states', 10)
 
-    def get_motor_configs(self) -> MotorConfigs:
+    def _get_motor_configs(self) -> MotorConfigs:
         self._req = nxt_msgs2.srv.MotorConfigs.Request()
         future = self._get_motors_configs_client.call_async(self._req)
         rclpy.spin_until_future_complete(self, future)
@@ -61,7 +61,7 @@ class JointStateAggregator(rclpy.node.Node):
 
         return motor_configs
 
-    def joint_state_subscriber_cb(self, msg: sensor_msgs.msg.JointState):
+    def _cb_join_joint_state_to_states(self, msg: sensor_msgs.msg.JointState):
         if self._motor_configs is None:
             self.get_logger().info("Motor configs not available yet, waiting to be available.")
             return
