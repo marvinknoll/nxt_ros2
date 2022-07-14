@@ -6,7 +6,7 @@ import sensor_msgs.msg
 import nxt_msgs2.msg
 import nxt_msgs2.srv
 
-from nxt_ros2.nxt_ros import MotorConfigs, RobotDimensions
+from nxt_ros2.util.helper_classes import MotorConfigs, RobotDimensions
 
 
 class DiffDriveController(rclpy.node.Node):

@@ -1,7 +1,7 @@
 import rclpy
 import rclpy.node
 
-from nxt_ros2.nxt_ros import MotorConfigs, RobotDimensions
+from nxt_ros2.util.helper_classes import MotorConfigs, RobotDimensions
 
 import nxt_msgs2.srv
 import nav_msgs.msg

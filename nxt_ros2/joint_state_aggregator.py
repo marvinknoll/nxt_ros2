@@ -7,9 +7,9 @@ import rclpy.clock
 import sensor_msgs.msg
 import nxt_msgs2.srv
 
-from nxt_ros2.nxt_ros import MotorConfigs
+from nxt_ros2.util.helper_classes import MotorConfigs
 
-from typing import Dict, List, Union
+from typing import Dict, List
 
 
 class JointState:
