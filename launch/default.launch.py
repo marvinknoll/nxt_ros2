@@ -1,4 +1,5 @@
 import os
+import yaml
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.substitutions import LaunchConfiguration, Command
@@ -6,6 +7,15 @@ from launch.actions import DeclareLaunchArgument, Shutdown
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 from launch.conditions import IfCondition
+
+
+def load_yaml_file(yaml_file_path):
+    try:
+        with open(yaml_file_path, 'r') as file:
+            return yaml.load(file, yaml.SafeLoader)
+    except EnvironmentError as e:
+        print(str(e))
+        return None
 
 
 def generate_launch_description():
@@ -80,15 +90,31 @@ def generate_launch_description():
         condition=IfCondition(LaunchConfiguration('visualize'))
     )
 
-    return LaunchDescription([
-        visualize_arg,
-        devices_config_arg,
-        model_arg,
-        rviz_config_arg,
-        nxt_node,
-        joint_state_aggregator_node,
-        odometry_node,
-        differential_drive_controller_node,
-        robot_state_publisher_node,
-        rviz_node
-    ])
+    config = load_yaml_file(base_robot_devices_config_file)
+    nxt_ros_devices = config["/nxt_ros_setup"]["ros__parameters"]["devices"]
+
+    valid_motor_ports = ["A", "B", "C"]
+    motor_types = []
+    for port in valid_motor_ports:
+        if port in nxt_ros_devices and "motor_type" in nxt_ros_devices[port]:
+            motor_types.append(nxt_ros_devices[port]["motor_type"])
+
+    initial_entities = []
+    initial_entities.append(visualize_arg)
+    initial_entities.append(devices_config_arg)
+    initial_entities.append(model_arg)
+    initial_entities.append(rviz_config_arg)
+    initial_entities.append(nxt_node)
+
+    # Note: this only works with the base_robot_devices_config_file and not with custom config files!
+    if "A" in nxt_ros_devices or "B" in nxt_ros_devices or "C" in nxt_ros_devices:
+        initial_entities.append(joint_state_aggregator_node)
+
+    if "wheel_motor_l" in motor_types and "wheel_motor_r" in motor_types:
+        initial_entities.append(differential_drive_controller_node)
+        initial_entities.append(odometry_node)
+
+    initial_entities.append(robot_state_publisher_node)
+    initial_entities.append(rviz_node)
+
+    return LaunchDescription(initial_entities=initial_entities)
