@@ -20,6 +20,7 @@ import nxt.brick
 import nxt.sensor
 import nxt.sensor.generic
 import nxt.motor
+import usb
 
 from nxt_ros2.util.helper_classes import SensorConfigs, MotorConfigs, RobotDimensions
 
@@ -47,8 +48,15 @@ class TouchSensor(rclpy.node.Node):
         msg.header.stamp = self.get_clock().now().to_msg()
         if self._frame_id is not None:
             msg.header.frame_id = self._frame_id
-        msg.touch = self._sensor.get_sample()
-        self._publisher.publish(msg)
+
+        try:
+            msg.touch = self._sensor.get_sample()
+        except usb.core.USBError as e:
+            self.get_logger().error("%s - lost connection to nxt brick. Shutting down." %
+                                    self.get_name())
+            rclpy.try_shutdown()
+        else:
+            self._publisher.publish(msg)
 
     def destroy_node(self):
         return super().destroy_node()
@@ -90,9 +98,15 @@ class UltraSonicSensor(rclpy.node.Node):
         msg.field_of_view = field_of_view
         msg.min_range = min_range
         msg.max_range = max_range
-        msg.range = self._sensor.get_sample() / 100  # meters
 
-        self._publisher.publish(msg)
+        try:
+            msg.range = self._sensor.get_sample() / 100  # meters
+        except usb.core.USBError:
+            self.get_logger().error("%s - lost connection to nxt brick. Shutting down." %
+                                    self.get_name())
+            rclpy.try_shutdown()
+        else:
+            self._publisher.publish(msg)
 
     def destroy_node(self):
         return super().destroy_node()
@@ -118,9 +132,15 @@ class ColorSensor(rclpy.node.Node):
         if self._frame_id is not None:
             msg.header.frame_id = self._frame_id
         sample = self._sensor.get_color()
-        msg.color = self.color_code_to_rgba(sample)
 
-        self._publisher.publish(msg)
+        try:
+            msg.color = self.color_code_to_rgba(sample)
+        except usb.core.USBError:
+            self.get_logger().error("%s - lost connection to nxt brick. Shutting down." %
+                                    self.get_name())
+            rclpy.try_shutdown()
+        else:
+            self._publisher.publish(msg)
 
     def destroy_node(self):
         self._sensor.set_light_color(nxt.sensor.Type.COLOR_EXIT)
@@ -194,13 +214,20 @@ class ReflectedLightSensor(rclpy.node.Node):
         msg.header.stamp = self.get_clock().now().to_msg()
         if self._frame_id is not None:
             msg.header.frame_id = self._frame_id
-        msg.color.a = float(
-            self._sensor.get_reflected_light(color))
-        msg.color.r = rgb[0]
-        msg.color.g = rgb[1]
-        msg.color.b = rgb[2]
 
-        self._publisher.publish(msg)
+        try:
+            msg.color.a = float(
+                self._sensor.get_reflected_light(color))
+
+        except usb.core.USBError:
+            self.get_logger().error("%s - lost connection to nxt brick. Shutting down." %
+                                    self.get_name())
+            rclpy.try_shutdown()
+        else:
+            msg.color.r = rgb[0]
+            msg.color.g = rgb[1]
+            msg.color.b = rgb[2]
+            self._publisher.publish(msg)
 
     def rgb_to_color_type(self, rgb: List[float]):
         """Converts List [r: float, g: float, b: float] to nxt_python's color code."""
@@ -218,7 +245,12 @@ class ReflectedLightSensor(rclpy.node.Node):
             return nxt.sensor.Type.COLOR_EXIT
 
     def destroy_node(self):
-        self._sensor.set_light_color(nxt.sensor.Type.COLOR_EXIT)
+        try:
+            self._sensor.set_light_color(nxt.sensor.Type.COLOR_EXIT)
+        except usb.core.USBError:
+            # already destroying node and shutting down
+            pass
+
         return super().destroy_node()
 
 
@@ -265,40 +297,47 @@ class Motor(rclpy.node.Node):
     def _cb_run_motor(self):
         now = self.get_clock().now()
         invert_direction = -1 if self._invert_direction else 1
-        position_rad = self._get_motor_position() * invert_direction
-        joint_name = self.get_name()
-        joint_effort = self._effort * self._POWER_TO_NM * invert_direction
-        velocity = 0
+        try:
+            position_rad = self._get_motor_position() * invert_direction
 
-        if self._last_js:
-            last_stamp = self._last_js.header.stamp
-            last_js_now = rclpy.time.Time(seconds=last_stamp.sec,
-                                          nanoseconds=last_stamp.nanosec,
-                                          clock_type=rclpy.clock.ClockType.ROS_TIME)
+            joint_name = self.get_name()
+            joint_effort = self._effort * self._POWER_TO_NM * invert_direction
+            velocity = 0
 
-            deltaSeconds = (now - last_js_now).nanoseconds/1000000000
-            deltaPosition = position_rad - self._last_js.position[0]
+            if self._last_js:
+                last_stamp = self._last_js.header.stamp
+                last_js_now = rclpy.time.Time(seconds=last_stamp.sec,
+                                              nanoseconds=last_stamp.nanosec,
+                                              clock_type=rclpy.clock.ClockType.ROS_TIME)
 
-            velocity = (deltaPosition / deltaSeconds)
+                deltaSeconds = (now - last_js_now).nanoseconds/1000000000
+                deltaPosition = position_rad - self._last_js.position[0]
 
-        js = sensor_msgs.msg.JointState()
-        js.header.stamp = now.to_msg()
-        js.name.append(joint_name)
-        js.effort.append(joint_effort)
-        js.position.append(position_rad)
-        js.velocity.append(velocity)
+                velocity = (deltaPosition / deltaSeconds)
 
-        self._js_publisher.publish(js)
-        self._last_js = js
+            js = sensor_msgs.msg.JointState()
+            js.header.stamp = now.to_msg()
+            js.name.append(joint_name)
+            js.effort.append(joint_effort)
+            js.position.append(position_rad)
+            js.velocity.append(velocity)
 
-        if not self._turning_lock.locked():
-            self._motor.run(int(self._effort * invert_direction), True)
-        elif self._goal_handle is not None and self._goal_handle.is_active:
-            feedback_msg = nxt_msgs2.action.TurnMotor.Feedback()
-            feedback_msg.header.stamp = self.get_clock().now().to_msg()
-            feedback_msg.start_position = self._action_start_rad
-            feedback_msg.current_position = position_rad
-            self._goal_handle.publish_feedback(feedback_msg)
+            self._js_publisher.publish(js)
+            self._last_js = js
+
+            if not self._turning_lock.locked():
+                self._motor.run(int(self._effort * invert_direction), True)
+            elif self._goal_handle is not None and self._goal_handle.is_active:
+                feedback_msg = nxt_msgs2.action.TurnMotor.Feedback()
+                feedback_msg.header.stamp = self.get_clock().now().to_msg()
+                feedback_msg.start_position = self._action_start_rad
+                feedback_msg.current_position = position_rad
+                self._goal_handle.publish_feedback(feedback_msg)
+
+        except usb.core.USBError:
+            self.get_logger().error("%s - lost connection to nxt brick. Shutting down." %
+                                    self.get_name())
+            rclpy.try_shutdown()
 
     def _get_motor_position(self):
         return math.radians(self._motor.get_tacho().rotation_count)
@@ -358,8 +397,12 @@ class Motor(rclpy.node.Node):
         return rclpy.action.CancelResponse.ACCEPT
 
     def destroy_node(self):
-        self._motor.idle()
-        self._action_server.destroy()
+        try:
+            self._motor.idle()
+        except usb.core.USBError:
+            # already destroying node and shutting down
+            pass
+
         return super().destroy_node()
 
 
@@ -668,7 +711,7 @@ def main(args=None):
                 executor.shutdown()
 
     finally:
-        rclpy.shutdown()
+        rclpy.try_shutdown()
 
 
 if __name__ == '__main__':
