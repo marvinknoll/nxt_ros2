@@ -5,7 +5,7 @@
   <version>0.0.0</version>
   <description>TODO: Package description</description>
   <maintainer email="marvin.knoll@protonmail.com">marvin</maintainer>
-  <license>TODO: License declaration</license>
+  <license>Apache-2.0 license</license>
 
   <depend>python3-nxt-python-pip</depend>
   <depend>nxt_msgs2</depend>
