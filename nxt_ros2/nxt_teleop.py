@@ -14,33 +14,27 @@ import termios
 
 
 MOVE_BINDINGS = {
-    'q': (1, 1),  # forward & left
-    'w': (1, 0),  # forward
-    'e': (1, -1),  # forward & right
-    'a': (0, 1),  # turn on sopt counter clockwise
-    'd': (0, -1),  # turn on spot clockwise
-    'y': (-1, -1),  # backward & left
-    'x': (-1, 0),  # backward
-    'c': (-1, 1)  # backward & right
+    "q": (1, 1),  # forward & left
+    "w": (1, 0),  # forward
+    "e": (1, -1),  # forward & right
+    "a": (0, 1),  # turn on sopt counter clockwise
+    "d": (0, -1),  # turn on spot clockwise
+    "y": (-1, -1),  # backward & left
+    "x": (-1, 0),  # backward
+    "c": (-1, 1),  # backward & right
 }
 
 MOVE_VEL_BINDINGS = {
-    'i': (1.5, 1),  # increase linear velocity by 1.5
-    'j': (1, 0.5),  # decrease angular velocity by 0.5
-    'k': (0.5, 1),  # decrease linear velocity by 0.5
-    'l': (1, 1.5)  # increase angular velocity by 1.5
+    "i": (1.5, 1),  # increase linear velocity by 1.5
+    "j": (1, 0.5),  # decrease angular velocity by 0.5
+    "k": (0.5, 1),  # decrease linear velocity by 0.5
+    "l": (1, 1.5),  # increase angular velocity by 1.5
 }
 
 # Third motor
-CONTROL_BINDINGS = {
-    'r': 1,
-    'f': -1
-}
+CONTROL_BINDINGS = {"r": 1, "f": -1}
 
-CONTROL_VEL_BINDINGS = {
-    'u': 0.9,
-    'o': 1.1
-}
+CONTROL_VEL_BINDINGS = {"u": 0.9, "o": 1.1}
 
 usage_msg = """
 Control your NXT robot!
@@ -49,7 +43,7 @@ Moving around:  | Turning the third motor
   q    w    e   | r
   a         d   | f
   y    x    c   |
-  
+
 k/i : decrease/increase linear velocity by the factor of 0.5 / 1.5
 j/l : decrease/increase angular velocity by the factor of 0.5 / 1.5
 u/o : decrease/increase third motor velocity by the factor of 0.9 / 1.1
@@ -61,7 +55,8 @@ CTRL-C to quit
 """
 
 error_msg = """
-Communication failed. Please restart the entire nxt_ros2 system and this script.
+Communication failed. Please restart the entire nxt_ros2 system and this
+script.
 """
 
 
@@ -81,7 +76,7 @@ def get_settings():
 
 
 def get_key(settings):
-    if sys.platform == 'win32':
+    if sys.platform == "win32":
         # getwch() returns a string on Windows
         key = msvcrt.getwch()
     else:
@@ -90,7 +85,7 @@ def get_key(settings):
         if rlist:
             key = sys.stdin.read(1)
         else:
-            key = ''
+            key = ""
         termios.tcsetattr(sys.stdin, termios.TCSADRAIN, settings)
     return key
 
@@ -99,28 +94,39 @@ class Teleop(rclpy.node.Node):
     def __init__(self):
         super().__init__("teleop")
 
-        self.declare_parameters(namespace="", parameters=[
-                                ('max_linear_vel', 0.113),  # m/s
-                                ('max_angular_vel', 1.693),  # rad/s
-                                ('max_effort', 100)
-                                ])
+        self.declare_parameters(
+            namespace="",
+            parameters=[
+                ("max_linear_vel", 0.113),  # m/s
+                ("max_angular_vel", 1.693),  # rad/s
+                ("max_effort", 100),
+            ],
+        )
 
         self._cmd_vel_publisher = self.create_publisher(
-            geometry_msgs.msg.TwistStamped, "cmd_vel", 10)
+            geometry_msgs.msg.TwistStamped, "cmd_vel", 10
+        )
 
         self._third_motor_je_publisher = self.create_publisher(
-            nxt_msgs2.msg.JointEffort, "joint_effort", 10)
+            nxt_msgs2.msg.JointEffort, "joint_effort", 10
+        )
 
         self._get_motors_configs_client = self.create_client(
-            nxt_msgs2.srv.MotorConfigs, "/nxt_ros_setup/get_motor_configs")
-        while not self._get_motors_configs_client.wait_for_service(timeout_sec=1.0):
+            nxt_msgs2.srv.MotorConfigs, "/nxt_ros_setup/get_motor_configs"
+        )
+        while not self._get_motors_configs_client.wait_for_service(
+            timeout_sec=1.0
+        ):
             self.get_logger().info(
-                "nxt_ros_setup/get_motor_configs service not available, waiting again...")
+                "nxt_ros_setup/get_motor_configs service not available,"
+                " waiting again..."
+            )
         self._third_motor_name: str = self._get_third_motor_name()
 
         timer_period = 0.2
         self.create_timer(
-            timer_period, self._cb_publish_twist_and_joint_effort)
+            timer_period, self._cb_publish_twist_and_joint_effort
+        )
 
     def _get_third_motor_name(self) -> Union[str, None]:
         self._req = nxt_msgs2.srv.MotorConfigs.Request()
@@ -138,7 +144,9 @@ class Teleop(rclpy.node.Node):
 
         return third_motor_name
 
-    def _cb_publish_twist_and_joint_effort(self, lin, ang, third_motor, lin_vel, ang_vel, third_motor_effort):
+    def _cb_publish_twist_and_joint_effort(
+        self, lin, ang, third_motor, lin_vel, ang_vel, third_motor_effort
+    ):
         # TwistStamped
         twist = geometry_msgs.msg.TwistStamped()
         twist.header.stamp = self.get_clock().now().to_msg()
@@ -165,11 +173,22 @@ class Teleop(rclpy.node.Node):
         if self._third_motor_name is None and third_motor != 0:
             self.get_logger().warn("There is no third motor defined")
         elif self._third_motor_name is not None:
-            print("{}\nCurrent velocities: linear: {}m/s - angular : {}rad/s - third motor effort: {}".format(
-                usage_msg, round(lin*lin_vel, 3), round(ang*ang_vel, 3), effort))
+            print(
+                "{}\nCurrent velocities: linear: {}m/s - angular : {}rad/s -"
+                " third motor effort: {}".format(
+                    usage_msg,
+                    round(lin * lin_vel, 3),
+                    round(ang * ang_vel, 3),
+                    effort,
+                )
+            )
         else:
-            print("{}\nCurrent velocities: linear: {}m/s - angular : {}rad/s".format(
-                  usage_msg, round(lin*lin_vel, 3), round(ang*ang_vel, 3)))
+            print(
+                "{}\nCurrent velocities: linear: {}m/s - angular : {}rad/s"
+                .format(
+                    usage_msg, round(lin * lin_vel, 3), round(ang * ang_vel, 3)
+                )
+            )
 
 
 def main(args=None):
@@ -192,7 +211,7 @@ def main(args=None):
 
         print(usage_msg)
 
-        while (1):
+        while 1:
             key = get_key(settings)
             if key in MOVE_BINDINGS.keys():
                 lin = MOVE_BINDINGS[key][0]
@@ -201,30 +220,40 @@ def main(args=None):
                 max_lin_vel = teleop.get_parameter("max_linear_vel").value
                 max_ang_vel = teleop.get_parameter("max_angular_vel").value
                 lin_vel = limit(
-                    lin_vel * MOVE_VEL_BINDINGS[key][0], -max_lin_vel, max_lin_vel)
+                    lin_vel * MOVE_VEL_BINDINGS[key][0],
+                    -max_lin_vel,
+                    max_lin_vel,
+                )
                 ang_vel = limit(
-                    ang_vel * MOVE_VEL_BINDINGS[key][1], -max_ang_vel, max_ang_vel)
+                    ang_vel * MOVE_VEL_BINDINGS[key][1],
+                    -max_ang_vel,
+                    max_ang_vel,
+                )
             elif key in CONTROL_BINDINGS.keys():
                 third_motor = CONTROL_BINDINGS[key]
             elif key in CONTROL_VEL_BINDINGS.keys():
                 max_effort = teleop.get_parameter("max_effort").value
-                third_motor_effort = limit(third_motor_effort * CONTROL_VEL_BINDINGS[key],
-                                           -max_effort, max_effort)
-            elif key == '\x03':
+                third_motor_effort = limit(
+                    third_motor_effort * CONTROL_VEL_BINDINGS[key],
+                    -max_effort,
+                    max_effort,
+                )
+            elif key == "\x03":
                 break
             else:
                 lin = 0
                 ang = 0
                 third_motor = 0
 
-            teleop._cb_publish_twist_and_joint_effort(lin, ang, third_motor, lin_vel,
-                                                      ang_vel, third_motor_effort)
+            teleop._cb_publish_twist_and_joint_effort(
+                lin, ang, third_motor, lin_vel, ang_vel, third_motor_effort
+            )
 
     except (KeyboardInterrupt, rclpy.executors.ExternalShutdownException):
-        print('Got clean shutdown signal, shutting down node.')
+        print("Got clean shutdown signal, shutting down node.")
         pass
 
-    except:
+    except Exception as _:
         print(error_msg)
 
     finally:
