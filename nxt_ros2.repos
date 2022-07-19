@@ -1,0 +1,9 @@
+repositories:
+  nxt_msgs2:
+    type: git
+    url: https://github.com/marvinknoll/nxt_msgs2
+    version: main
+  nxt_ros2:
+    type: git
+    url: https://github.com/marvinknoll/nxt_ros2
+    version: main

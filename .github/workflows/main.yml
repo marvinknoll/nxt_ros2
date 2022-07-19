@@ -1,0 +1,19 @@
+name: Build and Test
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: ros-tooling/setup-ros@v0.3
+
+      - name: ROS 2 CI Action
+        uses: ros-tooling/action-ros-ci@0.2.6
+        with:
+          target-ros2-distro: foxy
+          rosdep-skip-keys: nxt_msgs2
+          vcs-repo-file-url: https://raw.githubusercontent.com/marvinknoll/nxt_ros2/main/nxt_ros2.repos
