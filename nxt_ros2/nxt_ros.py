@@ -183,7 +183,7 @@ class ColorSensor(rclpy.node.Node):
         return super().destroy_node()
 
     def color_code_to_rgba(self, color_code: int) -> std_msgs.msg.ColorRGBA:
-        """Converts nxt_python's color code to std_msgs.msg.ColorRGBA"""
+        """Convert nxt_python's color code to std_msgs.msg.ColorRGBA."""
         color = std_msgs.msg.ColorRGBA()
         if color_code == 1:  # black
             color.r = 0.0
@@ -278,10 +278,7 @@ class ReflectedLightSensor(rclpy.node.Node):
             self._publisher.publish(msg)
 
     def rgb_to_color_type(self, rgb: List[float]):
-        """
-        Converts List [r: float, g: float, b: float] to nxt_python's color
-        code.
-        """
+        """Convert [r: float, g: float, b: float] to nxt_python color code."""
         if rgb[0] == 1.0 and rgb[1] == 0.0 and rgb[2] == 0.0:
             return nxt.sensor.Type.COLOR_RED
         elif rgb[0] == 0.0 and rgb[1] == 1.0 and rgb[2] == 0.0:
@@ -495,10 +492,7 @@ class Motor(rclpy.node.Node):
 
 
 class NxtRos2Setup(rclpy.node.Node):
-    """
-    Helper node to read ros2 parameters required for setting up the
-    device-nodes
-    """
+    """Helper node to read params required for setting up the device-nodes."""
 
     def __init__(self, brick: nxt.brick.Brick):
         self._brick = brick

@@ -22,10 +22,14 @@ class JointState:
 
 
 class JointStateAggregator(rclpy.node.Node):
-    """Subscribes to joint_state topic, and once it observes a js from all
+    """
+    Aggregates joint_state msgs into one msg published to joint_states.
+
+    Subscribes to joint_state topic, and once it observes a js from all
     joints, it aggregates them into a single JointState message and publishes
     it to /joint_states. Additionally, it calculates and addsone joint_state
-    'mimic' per motor, using motor configs from /nxt_ros_setup setup node."""
+    'mimic' per motor, using motor configs from /nxt_ros_setup setup node.
+    """
 
     def __init__(self):
         super().__init__("joint_state_aggregator")
