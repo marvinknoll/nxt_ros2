@@ -3,11 +3,12 @@ from glob import glob
 from setuptools import setup
 
 package_name = "nxt_ros2"
+nxt_ros2_util = "nxt_ros2/util"
 
 setup(
     name=package_name,
     version="0.0.0",
-    packages=[package_name],
+    packages=[package_name, nxt_ros2_util],
     data_files=[
         (
             os.path.join("share", "ament_index", "resource_index", "packages"),
