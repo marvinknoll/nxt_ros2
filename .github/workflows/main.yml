@@ -17,3 +17,11 @@ jobs:
           target-ros2-distro: foxy
           rosdep-skip-keys: nxt_msgs2
           vcs-repo-file-url: https://raw.githubusercontent.com/marvinknoll/nxt_ros2/main/nxt_ros2.repos
+          colcon-defaults: |
+            {
+              "test": {
+                "pytest-args.m": [
+                    "not brick_required"
+                ]
+              }
+            }

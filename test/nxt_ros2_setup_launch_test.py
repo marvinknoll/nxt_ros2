@@ -13,7 +13,7 @@ from ament_index_python.packages import get_package_share_directory
 import pytest
 
 
-@pytest.mark.launch_test
+@pytest.mark.brick_required
 def generate_test_description():
     base_robot_devices_config_file = os.path.join(
         get_package_share_directory("nxt_ros2"), "config", "base_robot.yaml"
@@ -42,6 +42,7 @@ def generate_test_description():
 # Run this tests with the following command: launch_test path/to/this/file
 # Note: To run tese tests, you have to build the package and connect a nxt
 #       brick
+@pytest.mark.brick_required
 class TestNxtRos2Setup(unittest.TestCase):
     def test_sensor_nodes_creation(self, proc_output, nxt_node):
         proc_output.assertWaitFor(
