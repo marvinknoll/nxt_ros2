@@ -21,7 +21,6 @@ class TestTouchSensor(unittest.TestCase):
         )
 
     def tearDown(self):
-        self.touch_sensor.destroy_node()
         if rclpy.ok():
             rclpy.shutdown()
 

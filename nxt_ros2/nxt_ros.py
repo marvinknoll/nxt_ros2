@@ -60,7 +60,7 @@ class TouchSensor(rclpy.node.Node):
 
         try:
             msg.touch = self._sensor.get_sample()
-        except usb.core.USBError as e:
+        except usb.core.USBError:
             self.get_logger().error(
                 "%s - lost connection to nxt brick. Shutting down."
                 % self.get_name()
@@ -165,10 +165,9 @@ class ColorSensor(rclpy.node.Node):
         msg.header.stamp = self.get_clock().now().to_msg()
         if self._frame_id is not None:
             msg.header.frame_id = self._frame_id
-        sample = self._sensor.get_color()
 
         try:
-            msg.color = self.color_code_to_rgba(sample)
+            sample = self._sensor.get_color()
         except usb.core.USBError:
             self.get_logger().error(
                 "%s - lost connection to nxt brick. Shutting down."
@@ -176,6 +175,7 @@ class ColorSensor(rclpy.node.Node):
             )
             rclpy.try_shutdown()
         else:
+            msg.color = self.color_code_to_rgba(sample)
             self._publisher.publish(msg)
 
     def destroy_node(self):
@@ -209,6 +209,8 @@ class ColorSensor(rclpy.node.Node):
             color.r = 255.0
             color.g = 255.0
             color.b = 255.0
+        else:
+            raise Exception("Invalid color code! valid codes: (1-6)")
         color.a = 1.0
         return color
 
