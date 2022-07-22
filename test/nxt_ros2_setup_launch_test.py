@@ -1,8 +1,5 @@
 import os
-import sys
 import unittest
-
-import ament_index_python
 
 import launch
 import launch.actions
