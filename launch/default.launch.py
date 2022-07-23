@@ -8,8 +8,27 @@ from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 from launch.conditions import IfCondition
 
+"""Launches the entire nxt_ros2 system based on multiple config files.
+
+  Launch arguments:
+  visualize: boolean, If the robot should be visualized in rviz
+  device_config_file: Absolute path to the parameter config file (.yaml)
+  model: Absolute path to .urdf or .urdf.xacro file describing the robot
+  rviz_config: Absolute path to .rviz config file
+
+  The nxt_ros2 executable, which creates the sensor and motor nodes, gets
+  executed by default.
+  The joint_state_aggregator executable gets executed only if at least one
+  motor is defined.
+  The odometry and controller executables get executed only if a motor of
+  the type 'wheel_motor_l' and one of the type 'wheel_motor_r' are defined.
+  The robot_state_publisher and the rviz_node get only executed if the
+  visualize argument is set to "true".
+"""
+
 
 def load_yaml_file(yaml_file_path):
+    """"""
     try:
         with open(yaml_file_path, "r") as file:
             return yaml.load(file, yaml.SafeLoader)
@@ -34,15 +53,20 @@ def generate_launch_description():
     )
 
     visualize_arg = DeclareLaunchArgument(
-        name="visualize", default_value="false", choices=["true", "false"]
+        name="visualize",
+        default_value="false",
+        choices=["true", "false"],
+        description=(
+            "Defines wether the robot shoule be visualized in rviz or not."
+        ),
     )
 
-    # Use custom config file with: ros2 launch nxt_ros2 default.launch.py
+    # Use a custom config file with: ros2 launch nxt_ros2 default.launch.py
     # device_config_file:='absolute/path/to/config/file.yaml'
     devices_config_arg = DeclareLaunchArgument(
         name="device_config_file",
         default_value=base_robot_devices_config_file,
-        description="Absolute path to config file (.yaml)",
+        description="Absolute path to parameters config file (.yaml)",
     )
 
     # Use custom model file with: ros2 launch nxt_ros2 default.launch.py
@@ -121,8 +145,9 @@ def generate_launch_description():
     initial_entities.append(rviz_config_arg)
     initial_entities.append(nxt_node)
 
-    # Note: this only works with the base_robot_devices_config_file and not
-    # with custom config files!
+    # Note: conditionally launching joint_state_aggregator,
+    # differential_drive_controller and odometry only works with the
+    # base_robot_devices_config_file and not with custom config files!
     if (
         "A" in nxt_ros_devices
         or "B" in nxt_ros_devices
