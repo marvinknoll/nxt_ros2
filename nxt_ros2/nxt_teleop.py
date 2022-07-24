@@ -123,11 +123,6 @@ class Teleop(rclpy.node.Node):
             )
         self._third_motor_name: str = self._get_third_motor_name()
 
-        timer_period = 0.2
-        self.create_timer(
-            timer_period, self._cb_publish_twist_and_joint_effort
-        )
-
     def _get_third_motor_name(self) -> Union[str, None]:
         self._req = nxt_msgs2.srv.MotorConfigs.Request()
         future = self._get_motors_configs_client.call_async(self._req)
@@ -144,8 +139,14 @@ class Teleop(rclpy.node.Node):
 
         return third_motor_name
 
-    def _cb_publish_twist_and_joint_effort(
-        self, lin, ang, third_motor, lin_vel, ang_vel, third_motor_effort
+    def publish_twist_and_joint_effort(
+        self,
+        lin: int,
+        ang: int,
+        third_motor: int,
+        lin_vel: float,
+        ang_vel: float,
+        third_motor_effort: float,
     ):
         # TwistStamped
         twist = geometry_msgs.msg.TwistStamped()
@@ -245,7 +246,7 @@ def main(args=None):
                 ang = 0
                 third_motor = 0
 
-            teleop._cb_publish_twist_and_joint_effort(
+            teleop.publish_twist_and_joint_effort(
                 lin, ang, third_motor, lin_vel, ang_vel, third_motor_effort
             )
 
