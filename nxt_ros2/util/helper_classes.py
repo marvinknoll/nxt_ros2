@@ -15,7 +15,7 @@ class MotorConfigs:
         self.motor_names: List[str] = []
         self.motor_types: List[str] = []
         self.motor_mimic_names: List[str] = []
-        self.motor_mimic_gear_ratios: List[int] = []
+        self.motor_mimic_gear_ratios: List[float] = []
         self.invert_directions: List[bool] = []
 
 
@@ -26,6 +26,6 @@ class RobotDimensions:
         wheel_radius: float = -1.0,
         rad_per_s_to_effort: float = -1.0,
     ):
-        self.axle_track = axle_track
-        self.wheel_radius = wheel_radius
-        self.rad_per_s_to_effort = rad_per_s_to_effort
+        self.axle_track: float = axle_track
+        self.wheel_radius: float = wheel_radius
+        self.rad_per_s_to_effort: float = rad_per_s_to_effort

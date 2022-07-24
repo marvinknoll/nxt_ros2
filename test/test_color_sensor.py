@@ -1,5 +1,6 @@
 import unittest
 from unittest.mock import MagicMock
+from nxt_ros2.util.errors import InvalidColorCode
 
 import rclpy
 
@@ -116,7 +117,7 @@ class TestColorSensor(unittest.TestCase):
             self.assertEqual(case.expected, actual)
 
     def test_color_code_to_rgba_raises_exception(self):
-        with self.assertRaises(Exception):
+        with self.assertRaises(InvalidColorCode):
             self.color_sensor.color_code_to_rgba(-1)
-        with self.assertRaises(Exception):
+        with self.assertRaises(InvalidColorCode):
             self.color_sensor.color_code_to_rgba(7)

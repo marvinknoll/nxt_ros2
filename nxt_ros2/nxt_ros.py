@@ -32,6 +32,23 @@ from typing import Dict, List, Union
 import math
 import threading
 
+from nxt_ros2.util.errors import (
+    DuplicateMotorMimicName,
+    DuplicateMotorName,
+    DuplicateMotorPort,
+    DuplicateSensorName,
+    DuplicateSensorPort,
+    InvalidColorCode,
+    InvalidMotorConfigparams,
+    InvalidMotorPort,
+    InvalidMotorType,
+    InvalidPort,
+    InvalidSensorConfigParams,
+    InvalidSensorPort,
+    InvalidSensorType,
+    InvalidWheelMotorConfig,
+)
+
 
 class TouchSensor(rclpy.node.Node):
     def __init__(
@@ -179,7 +196,13 @@ class ColorSensor(rclpy.node.Node):
             self._publisher.publish(msg)
 
     def destroy_node(self):
-        self._sensor.set_light_color(nxt.sensor.Type.COLOR_EXIT)
+        """Shut down light sensor and destroy node."""
+        try:
+            self._sensor.set_light_color(nxt.sensor.Type.COLOR_EXIT)
+        except usb.core.USBError:
+            # already destroying node and shutting down
+            pass
+
         return super().destroy_node()
 
     def color_code_to_rgba(self, color_code: int) -> std_msgs.msg.ColorRGBA:
@@ -210,7 +233,7 @@ class ColorSensor(rclpy.node.Node):
             color.g = 255.0
             color.b = 255.0
         else:
-            raise Exception("Invalid color code! valid codes: (1-6)")
+            raise InvalidColorCode
         color.a = 1.0
         return color
 
@@ -266,7 +289,6 @@ class ReflectedLightSensor(rclpy.node.Node):
 
         try:
             msg.color.a = float(self._sensor.get_reflected_light(color))
-
         except usb.core.USBError:
             self.get_logger().error(
                 "%s - lost connection to nxt brick. Shutting down."
@@ -405,7 +427,7 @@ class Motor(rclpy.node.Node):
             )
             rclpy.try_shutdown()
 
-    def _get_motor_position(self):
+    def _get_motor_position(self) -> float:
         return math.radians(self._motor.get_tacho().rotation_count)
 
     def _cb_srv_goal(self, goal_request):
@@ -543,9 +565,8 @@ class NxtRos2Setup(rclpy.node.Node):
                 continue
 
             if not sensor_params.keys() >= required_sensor_params:
-                raise Exception(
-                    "Missing or invalid sensor config parameters for sensor"
-                    " '%s', required: %s" % (port_str, required_sensor_params)
+                raise InvalidSensorConfigParams(
+                    port_str, required_sensor_params
                 )
 
             sensor_configs.sensor_ports.append(port_str)
@@ -565,7 +586,7 @@ class NxtRos2Setup(rclpy.node.Node):
 
         return sensor_configs
 
-    def str_to_sensor_port_enum(self, port: int) -> nxt.sensor.Port:
+    def str_to_sensor_port_enum(self, port: str) -> nxt.sensor.Port:
         if port == "1":
             return nxt.sensor.Port.S1
         elif port == "2":
@@ -575,7 +596,7 @@ class NxtRos2Setup(rclpy.node.Node):
         elif port == "4":
             return nxt.sensor.Port.S4
         else:
-            raise Exception("Invalid sensor port in config parameters")
+            raise InvalidSensorPort(port, ["1", "2", "3", "4"])
 
     def _check_sensor_configs(self, sensor_configs: SensorConfigs):
         valid_sensor_types = [
@@ -591,20 +612,12 @@ class NxtRos2Setup(rclpy.node.Node):
             sensor_type = sensor_configs.sensor_types[i]
 
             if sensor_configs.sensor_ports.count(sensor_port) > 1:
-                raise Exception(
-                    "Duplicate sensor_port '%s' in config parameters"
-                    % sensor_port
-                )
+                raise DuplicateSensorPort(sensor_port)
             if sensor_configs.sensor_names.count(sensor_name) > 1:
-                raise Exception(
-                    "Duplicate sensor_name '%s' in config parameters"
-                    % sensor_name
-                )
+                raise DuplicateSensorName(sensor_name)
             if sensor_type not in valid_sensor_types:
-                raise Exception(
-                    "Invalid sensor_type '%s' config for sensor on port: '%s'."
-                    " Valid sensor_type's: %s"
-                    % (sensor_type, sensor_port, valid_sensor_types)
+                raise InvalidSensorType(
+                    sensor_type, sensor_port, valid_sensor_types
                 )
 
     def _create_sensor_nodes(
@@ -695,10 +708,7 @@ class NxtRos2Setup(rclpy.node.Node):
                 continue
 
             if not motor_params.keys() >= required_motor_params:
-                raise Exception(
-                    "Missing or invalid motor config parameters for motor"
-                    " '%s', required: %s" % (port_str, required_motor_params)
-                )
+                raise InvalidMotorConfigparams(port_str, required_motor_params)
 
             motor_type = motor_params["motor_type"].value
 
@@ -725,7 +735,7 @@ class NxtRos2Setup(rclpy.node.Node):
         elif port == "C":
             return nxt.motor.Port.C
         else:
-            raise Exception("Invalid motor port in config parameters")
+            raise InvalidMotorPort(port, ["A", "B", "C"])
 
     def _check_motor_configs(self, motor_configs: MotorConfigs):
         valid_motor_types = ["wheel_motor_r", "wheel_motor_l", "other"]
@@ -737,48 +747,29 @@ class NxtRos2Setup(rclpy.node.Node):
             motor_type = motor_configs.motor_types[i]
 
             if motor_configs.motor_names.count(motor_name) > 1:
-                raise Exception(
-                    "Duplicate motor_name '%s' in config parameters"
-                    % motor_name
-                )
+                raise DuplicateMotorName(motor_name)
 
             if motor_configs.motor_mimic_names.count(motor_mimic_name) > 1:
-                raise Exception(
-                    "Duplicate motor_mimic_name '%s' in config parameters"
-                    % motor_mimic_name
-                )
+                raise DuplicateMotorMimicName(motor_mimic_name)
 
             if motor_configs.motor_ports.count(motor_port) > 1:
-                raise Exception(
-                    "Duplicate motor_port '%s' in config parameters"
-                    % motor_port
-                )
+                raise DuplicateMotorPort(motor_port)
 
             if motor_type not in valid_motor_types:
-                raise Exception(
-                    "Invalid config motor_type: '%s' for motor on port: '%s'."
-                    " Valid motor_type's: %s"
-                    % (motor_type, motor_port, valid_motor_types)
+                raise InvalidMotorType(
+                    motor_type, motor_port, valid_motor_types
                 )
 
         if (
             "wheel_motor_r" in motor_configs.motor_types
             and "wheel_motor_l" not in motor_configs.motor_types
         ):
-            raise Exception(
-                "If you define a motor with motor_type 'wheel_motor_r', please"
-                " also define one with motor_type: 'wheel_motor_l'. Otherwise"
-                " config all motor_types as 'other'"
-            )
+            raise InvalidWheelMotorConfig("wheel_motor_r")
         if (
             "wheel_motor_l" in motor_configs.motor_types
             and "wheel_motor_r" not in motor_configs.motor_types
         ):
-            raise Exception(
-                "If you define a motor with motor_type 'wheel_motor_l', please"
-                " also define one with motor_type: 'wheel_motor_r'. Otherwise"
-                " config all motor_types as 'other'"
-            )
+            raise InvalidWheelMotorConfig("wheel_motor_l")
 
     def _create_motor_nodes(
         self, brick: nxt.brick.Brick, motor_configs: MotorConfigs
@@ -870,14 +861,10 @@ class NxtRos2Setup(rclpy.node.Node):
 
         for port in ports:
             if (
-                port not in valid_motor_ports
-                and port not in valid_sensor_ports
+                port not in valid_sensor_ports
+                and port not in valid_motor_ports
             ):
-                raise Exception(
-                    "Invalid port '%s' in config! (Valid motor ports: %s."
-                    " Valid sensor ports: %s)"
-                    % (port, valid_motor_ports, valid_sensor_ports)
-                )
+                raise InvalidPort(port)
 
 
 def main(args=None):
