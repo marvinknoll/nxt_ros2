@@ -39,7 +39,7 @@ from nxt_ros2.util.errors import (
     DuplicateSensorName,
     DuplicateSensorPort,
     InvalidColorCode,
-    InvalidMotorConfigparams,
+    InvalidMotorConfigParams,
     InvalidMotorPort,
     InvalidMotorType,
     InvalidPort,
@@ -51,6 +51,18 @@ from nxt_ros2.util.errors import (
 
 
 class TouchSensor(rclpy.node.Node):
+    """
+    A ROS2 node that wraps nxt.sensor.generic.Touch.
+
+    Read touch sensor data and publish it to the according topic
+    every 0.3 seconds.
+
+    The name of the published topic is the same as the name of the node, which
+    can be specified via an argument on creation of the node.
+
+    If a frame_id is specified, it gets added to the published messages.
+    """
+
     def __init__(
         self,
         brick: nxt.brick.Brick,
@@ -58,6 +70,13 @@ class TouchSensor(rclpy.node.Node):
         port: nxt.sensor.Port,
         frame_id: Union[str, None] = None,
     ):
+        """
+        Initialize a touch sensor on the given port.
+
+        Retrieve a sensor object from the nxt brick via nxt.brick.get_sensor.
+        Create a publisher for the sensor data and create a timer for taking
+        data samples and publishing them every 0.3 seconds.
+        """
         super().__init__(name)
 
         self._frame_id = frame_id
@@ -70,6 +89,7 @@ class TouchSensor(rclpy.node.Node):
         self._timer = self.create_timer(timer_period, self._cb_measure)
 
     def _cb_measure(self):
+        """Try to get a sample from the sensor and publish the data."""
         msg = nxt_msgs2.msg.Touch()
         msg.header.stamp = self.get_clock().now().to_msg()
         if self._frame_id is not None:
@@ -87,10 +107,23 @@ class TouchSensor(rclpy.node.Node):
             self._publisher.publish(msg)
 
     def destroy_node(self):
+        """Destroy the node."""
         return super().destroy_node()
 
 
 class UltraSonicSensor(rclpy.node.Node):
+    """
+    A ROS2 node that wraps nxt.sensor.generic.Ultrasonic.
+
+    Read ultrasonic sensor data and publish it to the according topic
+    every 0.3 seconds.
+
+    The name of the published topic is the same as the name of the node, which
+    can be specified via an argument on creation of the node.
+
+    If a frame_id is specified, it gets added to the published messages.
+    """
+
     def __init__(
         self,
         brick: nxt.brick.Brick,
@@ -98,6 +131,14 @@ class UltraSonicSensor(rclpy.node.Node):
         port: nxt.sensor.Port,
         frame_id: Union[str, None] = None,
     ):
+        """
+        Initialize a ultrasonic sensor on the given port.
+
+        Declare node parameters for sensor configuration.
+        Retrieve a sensor object from the nxt brick via nxt.brick.get_sensor.
+        Create a publisher for the sensor data and create a timer for taking
+        data samples and publishing them every 0.3 seconds.
+        """
         super().__init__(name)
 
         self._frame_id = frame_id
@@ -122,6 +163,7 @@ class UltraSonicSensor(rclpy.node.Node):
         self._timer = self.create_timer(timer_period, self._cb_measure)
 
     def _cb_measure(self):
+        """Try to get a sample from the sensor and publish the data."""
         field_of_view = (
             self.get_parameter("field_of_view")
             .get_parameter_value()
@@ -155,10 +197,23 @@ class UltraSonicSensor(rclpy.node.Node):
             self._publisher.publish(msg)
 
     def destroy_node(self):
+        """Destroy the node."""
         return super().destroy_node()
 
 
 class ColorSensor(rclpy.node.Node):
+    """
+    A ROS2 node that wraps nxt.sensor.generic.Color.
+
+    Read color sensor data and publish it to the according topic
+    every 0.3 seconds.
+
+    The name of the published topic is the same as the name of the node, which
+    can be specified via an argument on creation of the node.
+
+    If a frame_id is specified, it gets added to the published messages.
+    """
+
     def __init__(
         self,
         brick: nxt.brick.Brick,
@@ -166,6 +221,13 @@ class ColorSensor(rclpy.node.Node):
         port: nxt.sensor.Port,
         frame_id: Union[str, None] = None,
     ):
+        """
+        Initialize a color sensor on the given port.
+
+        Retrieve a sensor object from the nxt brick via nxt.brick.get_sensor.
+        Create a publisher for the sensor data and create a timer for taking
+        data samples and publishing them every 0.3 seconds.
+        """
         super().__init__(name)
 
         self._frame_id = frame_id
@@ -178,6 +240,7 @@ class ColorSensor(rclpy.node.Node):
         self._timer = self.create_timer(timer_period, self._cb_measure)
 
     def _cb_measure(self):
+        """Try to get a sample from the sensor and publish the data."""
         msg = nxt_msgs2.msg.Color()
         msg.header.stamp = self.get_clock().now().to_msg()
         if self._frame_id is not None:
@@ -206,7 +269,24 @@ class ColorSensor(rclpy.node.Node):
         return super().destroy_node()
 
     def color_code_to_rgba(self, color_code: int) -> std_msgs.msg.ColorRGBA:
-        """Convert nxt_python's color code to std_msgs.msg.ColorRGBA."""
+        """
+        Convert nxt_python's color code to std_msgs.msg.ColorRGBA.
+
+        Parameters
+        ----------
+        color_code : int
+            nxt_python's color code:
+            https://ni.srht.site/nxt-python/latest/api/sensors/generic.html#nxt.sensor.generic.Color.DetectedColor
+
+        Returns
+        -------
+        std_msgs.msg.ColorRGBA
+
+        Raises
+        ------
+        InvalidColorCode
+
+        """
         color = std_msgs.msg.ColorRGBA()
         if color_code == 1:  # black
             color.r = 0.0
@@ -239,6 +319,18 @@ class ColorSensor(rclpy.node.Node):
 
 
 class ReflectedLightSensor(rclpy.node.Node):
+    """
+    A ROS2 node that wraps nxt.sensor.generic.Color.
+
+    Read reflected light sensor data and publish it to the according topic
+    every 0.3 seconds.
+
+    The name of the published topic is the same as the name of the node, which
+    can be specified via an argument on creation of the node.
+
+    If a frame_id is specified, it gets added to the published messages.
+    """
+
     def __init__(
         self,
         brick: nxt.brick.Brick,
@@ -246,6 +338,14 @@ class ReflectedLightSensor(rclpy.node.Node):
         port: nxt.sensor.Port,
         frame_id: Union[str, None] = None,
     ):
+        """
+        Initialize a ultrasonic sensor on the given port.
+
+        Declare node parameters for sensor configuration.
+        Retrieve a sensor object from the nxt brick via nxt.brick.get_sensor.
+        Create a publisher for the sensor data and create a timer for taking
+        data samples and publishing them every 0.3 seconds.
+        """
         super().__init__(name)
 
         self._frame_id = frame_id
@@ -261,6 +361,7 @@ class ReflectedLightSensor(rclpy.node.Node):
         self._timer = self.create_timer(timer_period, self._cb_measure)
 
     def _cb_set_rgb_color_param(self, params: List[rclpy.Parameter]):
+        """Only set rgb_color param if valid value."""
         updated_param = False
         for param in params:
             if (
@@ -275,6 +376,7 @@ class ReflectedLightSensor(rclpy.node.Node):
         return rcl_interfaces.msg.SetParametersResult(successful=updated_param)
 
     def _cb_measure(self):
+        """Try to get a sample from the sensor and publish the data."""
         rgb = (
             self.get_parameter("rgb_color")
             .get_parameter_value()
@@ -302,7 +404,22 @@ class ReflectedLightSensor(rclpy.node.Node):
             self._publisher.publish(msg)
 
     def rgb_to_color_type(self, rgb: List[float]):
-        """Convert [r: float, g: float, b: float] to nxt_python color code."""
+        """
+        Convert rgb List to nxt_python color code.
+
+        White corresponds to COLOR_FULL. Invalid rgb values return COLOR_EXIT.
+
+        Parameters
+        ----------
+        rgb : List[float]
+            [r, g, b]
+
+        Returns
+        -------
+            nxt.sensor.Type (COLOR_RED, COLOR_GREEN, COLOR_BLUE, COLOR_FULL
+            COLOR_NONE or COLOR_EXIT)
+
+        """
         if rgb[0] == 1.0 and rgb[1] == 0.0 and rgb[2] == 0.0:
             return nxt.sensor.Type.COLOR_RED
         elif rgb[0] == 0.0 and rgb[1] == 1.0 and rgb[2] == 0.0:
@@ -317,6 +434,7 @@ class ReflectedLightSensor(rclpy.node.Node):
             return nxt.sensor.Type.COLOR_EXIT
 
     def destroy_node(self):
+        """Shut down sensor and destroy node."""
         try:
             self._sensor.set_light_color(nxt.sensor.Type.COLOR_EXIT)
         except usb.core.USBError:
@@ -327,6 +445,18 @@ class ReflectedLightSensor(rclpy.node.Node):
 
 
 class Motor(rclpy.node.Node):
+    """
+    A ROS2 node that wraps nxt.motor.BaseMotor.
+
+    Publish motor position, velocity and effort every 0.1 seconds.
+    Call nxt.motor.BaseMotor.run with internal effort, every 0.1
+    seconds if no turn action is active. Internal effort can be updated
+    by publishing a messagge to the 'joint_effort' topic which this node
+    subscribes to.
+    Provides a ROS2 action that enables to turn the motor for given radians
+    with a given effort/power.
+    """
+
     def __init__(
         self,
         brick: nxt.brick.Brick,
@@ -334,6 +464,15 @@ class Motor(rclpy.node.Node):
         port: nxt.motor.Port,
         invert_direction: bool,
     ):
+        """
+        Construct motor attributes and initialize motor on given port.
+
+        Reset motor position counters to 0. Subscribe to 'joint_effort'
+        to get desired motor effort. Create 'joint_state' publisher to
+        publish the state of the motor. Create timer to publish joint_state
+        and run the motor or send feedback to the motor.turn action. Create
+        turn motor action server.
+        """
         super().__init__(name)
 
         self._port = port
@@ -375,10 +514,21 @@ class Motor(rclpy.node.Node):
         )
 
     def _joint_effort_cb(self, msg: nxt_msgs2.msg.JointEffort):
+        """Set internal motor goal effort from JointEffort message."""
         if msg.joint_name == self.get_name():
             self._effort = msg.effort
 
     def _cb_run_motor(self):
+        """
+        Publish joint_state and run motor or let it be turned from the action.
+
+        Get motor position and publish the data to the joint_state topic.
+        If there is no active action that is turning the motor, run the motor
+        with the internal effort.
+        If there is an active action that is turning the motor, publish
+        feedback containing the start position and current position to the
+        action's feedback.
+        """
         now = self.get_clock().now()
         invert_direction = -1 if self._invert_direction else 1
         try:
@@ -428,12 +578,25 @@ class Motor(rclpy.node.Node):
             rclpy.try_shutdown()
 
     def _get_motor_position(self) -> float:
+        """
+        Get and return motor position in radians.
+
+        motor position = 0 corresponds to the position of the motor
+        when this node got created.
+
+        Returns
+        -------
+        float : motor position in radians
+
+        """
         return math.radians(self._motor.get_tacho().rotation_count)
 
     def _cb_srv_goal(self, goal_request):
+        """Respond with goal response accepted."""
         return rclpy.action.GoalResponse.ACCEPT
 
     def _cb_srv_handle_accepted(self, goal_handle):
+        """Cancel previous motor.turn goal if existing and execute new one."""
         with self._goal_lock:
             if self._goal_handle is not None and self._goal_handle.is_active:
                 self._goal_handle.abort()
@@ -453,6 +616,27 @@ class Motor(rclpy.node.Node):
         goal_handle.execute()
 
     def _cb_srv_turn_motor(self, goal_handle):
+        """
+        Wrap nxt.motor.BaseMotor.turn function as a ROS2 action.
+
+        The arguments correspond to nxt.motor.BaseMotor.turn function.
+        More details can be found here:
+        https://ni.srht.site/nxt-python/latest/api/motor.html#nxt.motor.BaseMotor.turn
+
+        Cancelling the action stops the motor from turning. Depending on
+        the value for 'brake', the motor is braked or is set idle.
+
+        Sending a new goal while another one is still active, cancelles the old
+        goal and starts the new one.
+
+        The feedback of the action is being published in the _cb_run_motor
+        timer callback and contains the start and current position of the
+        motor.
+
+        The response of the action contains the 'start_position' (motor
+        position before turning) and 'end_position' (after turning) of the
+        motor.
+        """
         with self._turning_lock:
             req = goal_handle.request
             self._action_start_rad = self._get_motor_position()
@@ -503,9 +687,11 @@ class Motor(rclpy.node.Node):
             return result
 
     def _cb_srv_cancel(self, cancel_request):
+        """Respond with cancel request accepted."""
         return rclpy.action.CancelResponse.ACCEPT
 
     def destroy_node(self):
+        """Set motor to idle and shut down node."""
         try:
             self._motor.idle()
         except usb.core.USBError:
@@ -519,16 +705,26 @@ class NxtRos2Setup(rclpy.node.Node):
     """Helper node to read params required for setting up the device-nodes."""
 
     def __init__(self, brick: nxt.brick.Brick):
-        self._brick = brick
+        """
+        Allow undeclared params, create robot_dimension & motor_config service.
 
-        self._devices_prefix = "devices"
-        self._robot_dimensions_prefix = "robot_dimensions"
+        Allowing undeclared parameters and automatically declaring parameters
+        allows you to configure the required sesors and motors via config file
+        without having to declare each one beforehand.
 
+        The services can be used to request robot dimensions such as axle track
+        and motor configurations like gear ratios or motor mimic names.
+        """
         super().__init__(
             "nxt_ros_setup",
             allow_undeclared_parameters=True,
             automatically_declare_parameters_from_overrides=True,
         )
+
+        self._brick = brick
+
+        self._devices_prefix = "devices"
+        self._robot_dimensions_prefix = "robot_dimensions"
 
         motor_config_service_name = self.get_name() + "/get_motor_configs"
         self._motor_configs_service = self.create_service(
@@ -548,6 +744,20 @@ class NxtRos2Setup(rclpy.node.Node):
 
     # Sensors
     def get_sensor_configs_from_parameters(self) -> SensorConfigs:
+        """
+        Get sensor config from node parameters and return them.
+
+        If a port is defined, check if all required parameters are present.
+
+        Returns
+        -------
+        SensorConfigs : (sensor_ports, sensor_types, sensor_names, frame_ids)
+
+        Raises
+        ------
+        InvalidSensorConfigParams
+
+        """
         valid_sensor_ports = ["1", "2", "3", "4"]
         required_sensor_params = {"sensor_type", "sensor_name"}
 
@@ -587,6 +797,23 @@ class NxtRos2Setup(rclpy.node.Node):
         return sensor_configs
 
     def str_to_sensor_port_enum(self, port: str) -> nxt.sensor.Port:
+        """
+        Convert string port to sensor port enum.
+
+        Attributes
+        ----------
+        port : str
+            port as string ('1', '2', '3', '4')
+
+        Returns
+        -------
+        nxt.sensor.Port (S1, S2, S3, S4)
+
+        Raises
+        ------
+        InvalidSensorPort
+
+        """
         if port == "1":
             return nxt.sensor.Port.S1
         elif port == "2":
@@ -599,6 +826,21 @@ class NxtRos2Setup(rclpy.node.Node):
             raise InvalidSensorPort(port, ["1", "2", "3", "4"])
 
     def _check_sensor_configs(self, sensor_configs: SensorConfigs):
+        """
+        Check sensor config for duplicate ports or names and valid types.
+
+        Attributes
+        ----------
+        sensor_configs : SensorConfigs
+            contains sensor configs (names, ports, types)
+
+        Raises
+        ------
+        DuplicateSensorPort
+        DuplicateSensorName
+        InvalidSensorType
+
+        """
         valid_sensor_types = [
             "touch",
             "ultrasonic",
@@ -625,6 +867,23 @@ class NxtRos2Setup(rclpy.node.Node):
     ) -> List[
         Union[TouchSensor, UltraSonicSensor, ColorSensor, ReflectedLightSensor]
     ]:
+        """
+        Create a corresponding node for each sensor in the config.
+
+        Attributes
+        ----------
+        brick : nxt.brick.Brick
+            connected nxt brick
+        sensor_configs : SensorConfigs
+            configuration of the sensors
+
+        Returns
+        -------
+        List[Union[TouchSensor, UltraSonicSensor, ColorSensor,
+                   ReflectedLightSensor]]
+            sensor nodes
+
+        """
         sensor_nodes: List[
             Union[
                 TouchSensor,
@@ -678,6 +937,16 @@ class NxtRos2Setup(rclpy.node.Node):
     ) -> List[
         Union[TouchSensor, UltraSonicSensor, ColorSensor, ReflectedLightSensor]
     ]:
+        """
+        Get sensor configs from params, create sensor nodes and return them.
+
+        Returns
+        -------
+        List[Union[TouchSensor, UltraSonicSensor, ColorSensor,
+                   ReflectedLightSensor]]
+            sensor nodes
+
+        """
         sensor_configs = self.get_sensor_configs_from_parameters()
         self._check_sensor_configs(sensor_configs)
         sensor_nodes = self._create_sensor_nodes(self._brick, sensor_configs)
@@ -685,6 +954,21 @@ class NxtRos2Setup(rclpy.node.Node):
 
     # Motors
     def get_motor_configs_from_parameters(self) -> MotorConfigs:
+        """
+        Get motor config from node parameters and return them.
+
+        If a port is defined, check if all required parameters are present.
+
+        Returns
+        -------
+        MotorConfigs : (motor_names, motor_types, motor_mimic_names,
+                        motor_mimic_gear_ratios, invert_directions)
+
+        Raises
+        ------
+        InvalidMotorConfigParams
+
+        """
         valid_motor_ports = ["A", "B", "C"]
         required_motor_params = {
             "motor_name",
@@ -708,7 +992,7 @@ class NxtRos2Setup(rclpy.node.Node):
                 continue
 
             if not motor_params.keys() >= required_motor_params:
-                raise InvalidMotorConfigparams(port_str, required_motor_params)
+                raise InvalidMotorConfigParams(port_str, required_motor_params)
 
             motor_type = motor_params["motor_type"].value
 
@@ -728,6 +1012,23 @@ class NxtRos2Setup(rclpy.node.Node):
         return motor_configs
 
     def string_to_motor_port_enum(self, port: str) -> nxt.motor.Port:
+        """
+        Convert string port to motor port enum.
+
+        Attributes
+        ----------
+        port : str
+            port as string ('A', 'B', 'C')
+
+        Returns
+        -------
+        nxt.motor.Port (A, B, C)
+
+        Raises
+        ------
+        InvalidMotorPort
+
+        """
         if port == "A":
             return nxt.motor.Port.A
         elif port == "B":
@@ -738,6 +1039,24 @@ class NxtRos2Setup(rclpy.node.Node):
             raise InvalidMotorPort(port, ["A", "B", "C"])
 
     def _check_motor_configs(self, motor_configs: MotorConfigs):
+        """
+        Check motor config for duplicate names or ports and valid types.
+
+        Attributes
+        ----------
+        motor_configs : MotorConfigs
+            contains motor configs (names, ports, mimic_names, types
+                                    mimic_gear_ratios, inver_directions)
+
+        Raises
+        ------
+        DuplicateMotorname
+        DuplicateMotorMimicName
+        DuplicateMotorPort
+        InvalidMotorType
+        InvalidWheelMotorConfig
+
+        """
         valid_motor_types = ["wheel_motor_r", "wheel_motor_l", "other"]
 
         for i in range(len(motor_configs.motor_names)):
@@ -774,6 +1093,22 @@ class NxtRos2Setup(rclpy.node.Node):
     def _create_motor_nodes(
         self, brick: nxt.brick.Brick, motor_configs: MotorConfigs
     ) -> List[Motor]:
+        """
+        Create a corresponding node for each motor in the config.
+
+        Attributes
+        ----------
+        brick : nxt.brick.Brick
+            connected nxt brick
+        motor_configs : MotorConfigs
+            configuration of the motors
+
+        Returns
+        -------
+        List[Motor]
+            motor nodes
+
+        """
         motor_nodes: List[Motor] = []
         for i in range(len(motor_configs.motor_names)):
             motor_name = motor_configs.motor_names[i]
@@ -794,12 +1129,32 @@ class NxtRos2Setup(rclpy.node.Node):
         return motor_nodes
 
     def create_and_get_motor_nodes(self) -> List[Motor]:
+        """
+        Get motor config from parameters, create motor nodes and return them.
+
+        Returns
+        -------
+        List[Motor]
+            motor nodes
+
+        """
         motor_configs = self.get_motor_configs_from_parameters()
         self._check_motor_configs(motor_configs)
         motor_nodes = self._create_motor_nodes(self._brick, motor_configs)
         return motor_nodes
 
     def _cb_srv_get_motor_configs(self, request, response):
+        """
+        Get motor configs from parameters and return them as the response.
+
+        This service gets used by other nodes to request the motor configs.
+
+        Returns
+        -------
+        turn_action_response
+            contains motor configs
+
+        """
         motor_configs = self.get_motor_configs_from_parameters()
         response.header.stamp = self.get_clock().now().to_msg()
         response.motor_names = motor_configs.motor_names
@@ -814,6 +1169,14 @@ class NxtRos2Setup(rclpy.node.Node):
 
     # Robot dimensions
     def get_robot_dimensions_from_config_parameters(self) -> RobotDimensions:
+        """
+        Get robot dimensions from config prarameters and return them.
+
+        Returns
+        -------
+        RobotDimensions: (axle_track, wheel_radius, rad_per_s_to_effort)
+
+        """
         required_robot_dimension_params = {
             "axle_track",
             "wheel_radius",
@@ -844,6 +1207,17 @@ class NxtRos2Setup(rclpy.node.Node):
         return robot_dimensions
 
     def _cb_srv_get_robot_dimensions(self, request, response):
+        """
+        Get robot dimensions from parameters and return them as the response.
+
+        This service gets used by other nodes to request the robot dimensions.
+
+        Returns
+        -------
+        robot_dimensions_response
+            contains robot dimensions
+
+        """
         robot_dimensions = self.get_robot_dimensions_from_config_parameters()
         response.header.stamp = self.get_clock().now().to_msg()
         response.axle_track = robot_dimensions.axle_track
@@ -853,6 +1227,14 @@ class NxtRos2Setup(rclpy.node.Node):
 
     # General
     def check_ports_config_parameters(self) -> bool:
+        """
+        Check if config params include invalid ports.
+
+        Raises
+        ------
+        InvalidPort
+
+        """
         valid_motor_ports: List[str] = ["A", "B", "C"]
         valid_sensor_ports: List[str] = ["1", "2", "3", "4"]
 

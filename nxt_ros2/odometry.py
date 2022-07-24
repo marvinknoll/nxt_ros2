@@ -11,12 +11,32 @@ import geometry_msgs.msg
 
 import tf2_ros
 
-from typing import Dict
+from typing import List
 import math
+
+"""
+Calculate odometry based on drive wheels rotations count and publish it.
+
+Get motor configs and robot dimensions required for odometry calculations
+from NxtRos2Setup node. Calculate odometry from state of the 'wheel_motor_l'
+and 'wheel_motor_r' and publish it to the 'odom' topic and send it to tf2 via
+a TransformBroadcaster.
+"""
 
 
 class Odometry(rclpy.node.Node):
+    """
+    Calculate and publish odometry from robot dimensions and wheel positions.
+
+    Get motor configs and robot dimensions from NxtRos2Setup node via a
+    service. Subscribe to 'joint_states' topic and on every incomming message
+    calculate the odometry of the robot and publish it to the 'odom' topic.
+    Furthermore send the odometry transformations to tf2 via a
+    TransformBroadcaster.
+    """
+
     def __init__(self):
+        """Create action clients, subscriber and TransFormBoradcaster."""
         super().__init__("odometry")
 
         # Get motor_configs from setup node
@@ -86,6 +106,7 @@ class Odometry(rclpy.node.Node):
         self._transform_broadcaster = tf2_ros.TransformBroadcaster(self)
 
     def _get_motor_configs(self) -> MotorConfigs:
+        """Request motor configs from NxtRos2Setup node and return it."""
         self._req = nxt_msgs2.srv.MotorConfigs.Request()
         future = self._get_motors_configs_client.call_async(self._req)
         rclpy.spin_until_future_complete(self, future)
@@ -110,6 +131,7 @@ class Odometry(rclpy.node.Node):
         return motor_configs
 
     def _get_robot_dimensions(self) -> RobotDimensions:
+        """Request robot dimensions from NxtRos2Setup node and return it."""
         self._req = nxt_msgs2.srv.RobotDimensions.Request()
         future = self._get_robot_dimensions_client.call_async(self._req)
         rclpy.spin_until_future_complete(self, future)
@@ -132,6 +154,7 @@ class Odometry(rclpy.node.Node):
         return robot_dimensions
 
     def _cb_publish_odometry(self, msg: sensor_msgs.msg.JointState):
+        """Calculate odom, publish it to 'odom' topic and send transform."""
         r_mimic_index = self._motor_configs.motor_types.index("wheel_motor_r")
         l_mimic_index = self._motor_configs.motor_types.index("wheel_motor_l")
 
@@ -206,7 +229,6 @@ class Odometry(rclpy.node.Node):
         odom.pose.pose.orientation.y = quaternion[1]
         odom.pose.pose.orientation.z = quaternion[2]
         odom.pose.pose.orientation.w = quaternion[3]
-        # TODO odom.pose.covariance
 
         odom.child_frame_id = "base_link"
         odom.twist.twist.linear.x = trans
@@ -215,7 +237,6 @@ class Odometry(rclpy.node.Node):
         odom.twist.twist.angular.x = 0.0
         odom.twist.twist.angular.y = 0.0
         odom.twist.twist.angular.z = rot
-        # TODO odom.twist.covariance
 
         self._odom_publisher.publish(odom)
 
@@ -226,8 +247,23 @@ class Odometry(rclpy.node.Node):
         self.last_x = x
         self.last_y = y
 
-    def euler_to_quaternion(self, yaw, pitch, roll):
-        # yaw (Z), pitch (Y), roll (X) in radians
+    def euler_to_quaternion(
+        self, yaw: float, pitch: float, roll: float
+    ) -> List[float]:
+        """
+        Convert euler angles to quaternions.
+
+        Attributes
+        ----------
+        yaw : float
+        pitch : float
+        roll : float
+
+        Returns
+        -------
+        List[float] : length 4 -> Quaternions
+
+        """
         cy = math.cos(yaw / 2)
         sy = math.sin(yaw / 2)
         cp = math.cos(pitch / 2)

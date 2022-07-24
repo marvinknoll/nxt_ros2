@@ -9,9 +9,47 @@ import nxt_msgs2.srv
 
 from nxt_ros2.util.helper_classes import MotorConfigs, RobotDimensions
 
+"""
+  Create and spinn a ROS2 node that serves as a drive controller.
+
+  The controller supports only robots with two driving wheels and differential
+  drive.
+
+  The controller converts geometry_msgs.msg.TwistStamped messages to joint
+  effort messages. These joint effort messages describe the effort that needs
+  to be applied to the 'wheel_motor_l' and the 'wheel_motor_r' to achieve the
+  desired linear and angular velocity.
+"""
+
 
 class DiffDriveController(rclpy.node.Node):
+    """
+    Drive controller for a two wheel differentially driven robot.
+
+    Convert linear and angular velocity to motor efforts for each wheel.
+
+    Subscribe to 'cmd_vel' topic which contains geometry_msgs.msg.TwistStamped
+    messages that describe the desired linear and angular velocity of the
+    robot. Subscribe to 'joint_states' topic and as soon as a message is read
+    from this topic, calculate the corresponding joint effort for both motors
+    ('wheel_motor_l' and 'wheel_motor_r') and publish them to the'joint_effort'
+    topic.
+
+    Initially request motor configurations and robot dimensions from the
+    NxtRos2Setup node via services.
+
+    Shut itself down if there is not one motor with type 'wheel_motor_l'
+    and another motor with type 'wheel_motor_r' or not valid robot dimensions.
+    """
+
     def __init__(self):
+        """
+        Request config from NxtRos2Setup node, create subscriber and publisher.
+
+        Request motor configs and robot dimensions from NxtRos2Setup node,
+        subscribe to 'cmd_vel' and 'joint_states' topics and create a
+        publisher for the 'joint_effort' topic.
+        """
         super().__init__("diff_drive_controller")
 
         # Motor configs
@@ -85,6 +123,7 @@ class DiffDriveController(rclpy.node.Node):
         )
 
     def _get_motor_configs(self) -> MotorConfigs:
+        """Request motor configs from NxtRos2Setup node and return it."""
         self._req = nxt_msgs2.srv.MotorConfigs.Request()
         future = self._get_motors_configs_client.call_async(self._req)
         rclpy.spin_until_future_complete(self, future)
@@ -107,6 +146,7 @@ class DiffDriveController(rclpy.node.Node):
         return motor_configs
 
     def _get_robot_dimensions(self) -> RobotDimensions:
+        """Request robot dimensions from NxtRos2Setup node and return it."""
         self._req = nxt_msgs2.srv.RobotDimensions.Request()
         future = self._get_robot_dimensions_client.call_async(self._req)
         rclpy.spin_until_future_complete(self, future)
@@ -129,10 +169,18 @@ class DiffDriveController(rclpy.node.Node):
         return robot_dimensions
 
     def _cb_set_goal_vels(self, msg: geometry_msgs.msg.TwistStamped):
+        """Set internal linear and angular goal vels from twist messages."""
         self._goal_lin_vel = msg.twist.linear.x
         self._goal_ang_vel = msg.twist.angular.z
 
     def _cb_calc_and_pub_joint_efforts(self, msg: sensor_msgs.msg.JointState):
+        """
+        Convert linear and angular velocities to joint effort per wheel.
+
+        On every incomming joint_states message, calculate the corresponding
+        joint effort for 'wheel_motor_l' and 'wheel_motor_r' and publish
+        them to the 'joint_effort' topic.
+        """
         motor_r_index = self._motor_configs.motor_types.index("wheel_motor_r")
         motor_l_index = self._motor_configs.motor_types.index("wheel_motor_l")
         motor_r_name = self._motor_configs.motor_names[motor_r_index]

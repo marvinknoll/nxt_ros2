@@ -66,7 +66,7 @@ class InvalidSensorType(Error):
         super().__init__(self.message)
 
 
-class InvalidMotorConfigparams(Error):
+class InvalidMotorConfigParams(Error):
     """Raised if invalis motor param wa read or a require one is missing."""
 
     def __init__(self, port_str, required_motor_params):

@@ -12,6 +12,15 @@ import select
 import tty
 import termios
 
+"""
+Controll a NXT robot via the keyboard.
+
+Continuously publish the linear and angular velocity of the robot as
+TwistStamped messages on the topic 'cmd_vel' to make it drive.
+
+Continuously publish the effort of the third motor as a JointEffort
+messages on the topic 'joint_effort' to turn it in the desired direction.
+"""
 
 MOVE_BINDINGS = {
     "q": (1, 1),  # forward & left
@@ -91,7 +100,19 @@ def get_key(settings):
 
 
 class Teleop(rclpy.node.Node):
+    """
+    ROS2 node for publishing to 'cmd_vel' and 'joint_effort' topics.
+
+    Requests motor_configs from NxtRos2Setup node via service.
+    """
+
     def __init__(self):
+        """
+        Create publishers and service_clients for teleoperation.
+
+        Create publisher for 'cmd_vel' topic and 'joint_effort'. Get motor
+        configs from NxtRos2Setup node via service.
+        """
         super().__init__("teleop")
 
         self.declare_parameters(
@@ -124,6 +145,7 @@ class Teleop(rclpy.node.Node):
         self._third_motor_name: str = self._get_third_motor_name()
 
     def _get_third_motor_name(self) -> Union[str, None]:
+        """Request motor configs and return name of motor with type 'other'."""
         self._req = nxt_msgs2.srv.MotorConfigs.Request()
         future = self._get_motors_configs_client.call_async(self._req)
         rclpy.spin_until_future_complete(self, future)
@@ -148,6 +170,25 @@ class Teleop(rclpy.node.Node):
         ang_vel: float,
         third_motor_effort: float,
     ):
+        """
+        Publish TwistStamped and JointEffort messages based on input.
+
+        Attributes
+        ----------
+        lin : int
+            linear velocity multiplier for positive and negative velocities
+        ang : int
+            angular velocity multiplier for positive and negative velocities
+        third_motor int
+            third_motor_effort multiplier for positive and negative efforts
+        lin_vel : float
+            desired absolute linear velocity
+        ang_vel : float
+            desired absolute angular velocity
+        third_motor_effort : float
+            desired absolute effort for third motor
+
+        """
         # TwistStamped
         twist = geometry_msgs.msg.TwistStamped()
         twist.header.stamp = self.get_clock().now().to_msg()
