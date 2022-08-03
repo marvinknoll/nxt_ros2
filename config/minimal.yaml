@@ -1,0 +1,17 @@
+# Minimal configuration for one touch sensor connected on port "1".
+
+# For more information about these config files, take a look at:
+# nxt_ros2/config/base_robot.yaml
+
+/nxt_ros_setup:
+  ros__parameters:
+    devices:
+      1:
+        sensor_type: touch
+        sensor_name: touch_sensor
+      A:
+        motor_type: other
+        motor_name: test_motor
+        motor_mimic_name: test_mimic
+        motor_mimic_gear_ratio: -0.33333
+        invert_direction: false
