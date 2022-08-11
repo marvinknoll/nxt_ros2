@@ -590,13 +590,27 @@ For more details on the actions, check out the [service definitions](https://git
 
 # Base Robot
 
-The nxt_ros2 package was built to easily test localization, navigation, planning or other algorithms on the Lego Mindstorms NXT 2.0 robot. To jump directly to implementing and testing algorithms, the [build instructions](./docs/base_robot_build_instructions.pdf) for a “base robot”, which should be suitable for the most common use cases, are provided.
+The nxt_ros2 package was built to easily test localization, navigation, planning or other algorithms on the Lego Mindstorms NXT 2.0 robot. To jump directly to implementing and testing algorithms, the build instructions for a “base robot”, which should be suitable for the most common use cases, are provided [here](https://github.com/marvinknoll/nxt_ros2/blob/main/docs/base_robot_build_instructions.pdf).
 
-The nxt_ros2 package comes preconfigured for this robot, allowing you to launch the entire package with one command:
+Once you have build the robot, connect the motors and sensors to the following ports:
+| Motor / Sensor | NXT Port |
+|----------------|----------|
+| radar motor | A |
+| left wheel motor | B |
+| right wheel motor | C |
+| touch sensor | 1 |
+| ultrasonic sensor | 4 |
+| color sensor | 3 |
+
+Once all motors and sensors are connected turn on the NXT brick and connect it via USB-cable to your computer. Now you are ready to launch the package to communicate with the robot through ROS 2.
+
+The package comes preconfigured for the base robot, allowing you to launch the entire package with one command:
 
 ```bash
 ros2 launch nxt_ros2 default.launch.py
 ```
+
+Once the package is launched, all [provided interfaces](#provided-interfaces-to-communicate-with-the-nxt) should be available and can be used to read sensor data, control motors and much more.
 
 The package also provides a teleoperation script that allows you to drive the robot and control the ultrasonic sensor mounted on top via the keyboard. To run the teleoperation script, open a new terminal, source your environment and execute:
 
