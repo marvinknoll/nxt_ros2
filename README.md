@@ -592,6 +592,8 @@ For more details on the actions, check out the [service definitions](https://git
 
 The nxt_ros2 package was built to easily test localization, navigation, planning or other algorithms on the Lego Mindstorms NXT 2.0 robot. To jump directly to implementing and testing algorithms, the build instructions for a “base robot”, which should be suitable for the most common use cases, are provided [here](https://github.com/marvinknoll/nxt_ros2/blob/main/docs/base_robot_build_instructions.pdf).
 
+Watch a video demo of the base robot [here](https://drive.google.com/file/d/1PWM2vTRb53zGsE78gpthKCl1n-yY25vm/view?usp=sharing).
+
 Once you have build the robot, connect the motors and sensors to the following ports:
 | Motor / Sensor | NXT Port |
 |----------------|----------|
