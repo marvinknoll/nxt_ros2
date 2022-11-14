@@ -709,6 +709,7 @@ class Brick(rclpy.node.Node):
         super().__init__("brick")
 
         self._brick = brick
+        self._brick.keep_alive()
 
         get_battery_level_service_name = self.get_name() + "/get_battery_level"
         self._get_battery_level_service = self.create_service(
