@@ -701,6 +701,28 @@ class Motor(rclpy.node.Node):
         return super().destroy_node()
 
 
+class Brick(rclpy.node.Node):
+    def __init__(
+        self,
+        brick: nxt.brick.Brick,
+    ):
+        super().__init__("brick")
+
+        self._brick = brick
+
+        get_battery_level_service_name = self.get_name() + "/get_battery_level"
+        self._get_battery_level_service = self.create_service(
+            nxt_msgs2.srv.GetBatteryLevel,
+            get_battery_level_service_name,
+            self._cb_srv_get_battery_level,
+        )
+
+    def _cb_srv_get_battery_level(self, request, response):
+        response.header.stamp = self.get_clock().now().to_msg()
+        response.battery_voltage = self._brick.get_battery_level()
+        return response
+
+
 class NxtRos2Setup(rclpy.node.Node):
     """Helper node to read params required for setting up the device-nodes."""
 
@@ -1271,6 +1293,8 @@ def main(args=None):
                 setup_node.check_ports_config_parameters()
                 nodes.extend(setup_node.create_and_get_sensor_nodes())
                 nodes.extend(setup_node.create_and_get_motor_nodes())
+
+                nodes.append(Brick(brick))
 
                 for node in nodes:
                     executor.add_node(node)
