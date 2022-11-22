@@ -236,7 +236,7 @@ class ColorSensor(rclpy.node.Node):
 
         self._publisher = self.create_publisher(nxt_msgs2.msg.Color, name, 10)
 
-        timer_period = 0.3  # seconds
+        timer_period = 0.05  # seconds
         self._timer = self.create_timer(timer_period, self._cb_measure)
 
     def _cb_measure(self):
